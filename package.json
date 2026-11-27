@@ -1,0 +1,13 @@
+{
+  "name": "creakwood",
+  "private": true,
+  "scripts": {
+    "start": "bun server.ts",
+    "deploy": "wrangler deploy",
+    "content": "node scripts/contentmd.mjs",
+    "check": "node scripts/contentcheck.mjs && node e2e/play.mjs ${SHOTS:-/tmp/creakwood-shots}"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

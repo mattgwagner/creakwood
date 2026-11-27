@@ -1,0 +1,2565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#14112a">
+<title>Creakwood</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Creepster&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#14112a;--ink:#2b1d10;--paper:#f6ebcf;--paper2:#efdfb8;--edge:#b08850;
+  --lamp:#ffcf4a;--pumpkin:#f08a24;--plum:#5b3f8c;--moss:#4f8a4b;--red:#c8432f;
+  --hd:Creepster,'Chalkduster',fantasy,cursive;--bd:Andika,'Atkinson Hyperlegible','Comic Sans MS',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--night);font-family:var(--bd);color:var(--ink);touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+button{font-family:var(--bd);color:inherit}
+#c{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none}
+
+/* hotspots and doors are real buttons laid over the canvas */
+#spots{position:fixed;inset:0;pointer-events:none;z-index:5}
+.spot{position:absolute;pointer-events:auto;background:transparent;border:0;border-radius:18px;cursor:pointer;padding:0}
+.spot:focus-visible{outline:4px dashed var(--lamp)}
+.spot .tag{position:absolute;left:50%;top:-8px;transform:translate(-50%,-100%);width:max-content;max-width:min(190px,17vw);text-align:center;line-height:1.2;background:rgba(20,17,42,.85);color:#fff;border:3px solid var(--lamp);border-radius:12px;padding:4px 12px;font-size:clamp(15px,1.7vw,21px);font-weight:700}
+
+/* HUD */
+#hud{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:12px;right:12px;z-index:8;display:none;align-items:flex-start;gap:10px;pointer-events:none}
+#hud.on{display:flex}
+#hud .where{background:rgba(20,17,42,.8);color:#f3e6c4;border:3px solid #6a5a8a;border-radius:14px;padding:6px 14px;font-size:clamp(16px,1.8vw,22px);font-weight:700}
+#hud .where small{display:block;font-weight:400;opacity:.8;font-size:.8em}
+#hud .sp{flex:1}
+.ico{pointer-events:auto;width:clamp(52px,5vw,64px);height:clamp(52px,5vw,64px);border-radius:50%;border:4px solid #2b1d10;background:var(--paper);font-size:clamp(22px,2.4vw,30px);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 4px 0 #0008}
+.ico:active{transform:translateY(3px);box-shadow:none}
+
+/* Wick's speech bubble */
+#wick{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:30;display:none;max-width:min(860px,92vw);background:#fffaf0;border:4px solid var(--ink);border-radius:22px;padding:10px 16px 10px 72px;font-size:clamp(19px,2.1vw,25px);line-height:1.35;box-shadow:0 6px 0 #0007;align-items:center;gap:10px}
+#wick.on{display:flex}
+#wick.up{bottom:auto;top:calc(150px + env(safe-area-inset-top,0px))}
+#wick .face{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:52px;height:64px}
+#wick .txt{flex:1}
+#wick .say{flex:none;width:46px;height:46px;font-size:22px;border-width:3px}
+
+/* big context button (Hide / Freeze / Clue Board) */
+#act{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:9;display:none;font-family:var(--hd);font-size:clamp(30px,3.6vw,46px);letter-spacing:2px;padding:10px 30px;border-radius:20px;border:5px solid var(--ink);background:var(--lamp);box-shadow:0 7px 0 #0008;cursor:pointer}
+#act.on{display:block}
+#act.warn{background:#ff7a5c;animation:pulse .5s infinite alternate}
+@keyframes pulse{to{transform:scale(1.07)}}
+
+/* door question banner */
+#doorbar{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:9;display:none;width:min(900px,94vw);background:var(--paper);border:5px solid var(--ink);border-radius:18px;padding:10px 14px;box-shadow:0 6px 0 #0008;text-align:center}
+#doorbar.on{display:block}
+#doorbar .q{font-size:clamp(21px,2.4vw,29px);font-weight:700;line-height:1.3}
+#doorbar .row{margin-top:6px}
+
+/* generic overlay screens */
+.screen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:20;padding:16px;background:rgba(10,8,24,.62)}
+.screen.on{display:flex}
+.screen.clear{background:transparent}
+.card{background:var(--paper);border:6px solid var(--ink);border-radius:20px;box-shadow:0 10px 0 #0009;padding:clamp(16px,2.4vw,32px);max-width:min(960px,96vw);max-height:94vh;overflow:auto;text-align:center;position:relative}
+h1.title{font-family:var(--hd);font-weight:400;font-size:clamp(64px,10vw,128px);margin:0;line-height:1;color:var(--lamp);-webkit-text-stroke:2px var(--ink);text-shadow:0 6px 0 var(--ink),0 0 30px #ffcf4a66;letter-spacing:3px}
+h2{font-family:var(--hd);font-weight:400;font-size:clamp(36px,4.6vw,58px);margin:4px 0 8px;letter-spacing:2px;line-height:1.05;color:var(--plum)}
+h3{font-size:clamp(20px,2.2vw,27px);margin:16px 0 6px}
+p{font-size:clamp(19px,2.1vw,26px);line-height:1.45;margin:10px auto;max-width:34em}
+.btn{font-weight:700;font-size:clamp(21px,2.3vw,30px);background:var(--lamp);border:5px solid var(--ink);border-radius:16px;box-shadow:0 6px 0 var(--ink);padding:8px 26px;margin:8px;cursor:pointer;min-height:60px}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--ink)}
+.btn.go{background:var(--pumpkin);color:#fff;text-shadow:0 2px 0 #0006}
+.btn.sm{font-size:clamp(17px,1.8vw,22px);padding:5px 16px;min-height:50px;box-shadow:0 4px 0 var(--ink);border-width:4px}
+.btn.on{background:#9be88f}
+.btn:disabled{opacity:.4}
+.row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center}
+.small{font-size:clamp(15px,1.5vw,19px);color:#5a4a36}
+.cases{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:10px 0}
+.case{width:clamp(170px,19vw,230px);border:5px solid var(--ink);border-radius:16px;background:#fff8e6;padding:10px;cursor:pointer;box-shadow:0 5px 0 var(--ink);font-size:clamp(17px,1.8vw,21px)}
+.case b{display:block;font-family:var(--hd);font-weight:400;font-size:clamp(24px,2.5vw,32px);letter-spacing:1px;color:var(--plum)}
+.case.sel{background:#ffe9a3;outline:5px solid var(--pumpkin)}
+.case.lock{opacity:.45;cursor:default}
+.case .st{color:#d18b00;font-size:1.3em;letter-spacing:2px}
+.hold{position:relative;overflow:hidden}
+.hold i{position:absolute;left:0;top:0;bottom:0;width:0;background:#ffffff88;pointer-events:none}
+
+/* ---------- clue card ---------- */
+#clue{position:fixed;inset:0;z-index:15;display:none;background:rgba(10,8,24,.72);padding:max(10px,env(safe-area-inset-top,0px)) 12px 12px;gap:12px;align-items:stretch;justify-content:center}
+#clue.on{display:flex}
+.paper{flex:1 1 640px;max-width:780px;display:flex;flex-direction:column;background:var(--paper);border:5px solid var(--ink);border-radius:10px;box-shadow:0 8px 0 #0009;min-width:0;position:relative}
+.paper .lab{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:3px dashed var(--edge);font-size:clamp(16px,1.6vw,20px);color:#6b5032;font-weight:700}
+.paper .lab span{flex:1}
+.paper .lab .ico{width:50px;height:50px;font-size:22px;border-width:3px}
+.text{flex:1;overflow:auto;padding:12px clamp(14px,2vw,28px) 24px;font-size:var(--fs,24px);line-height:1.5;-webkit-overflow-scrolling:touch}
+.text .col{max-width:60ch;margin:0 auto}
+.text .col+.col{margin-top:18px;padding-top:14px;border-top:4px double var(--edge)}
+.text p{font-size:inherit;margin:0 0 .55em;max-width:none;line-height:inherit}
+.text .h1{font-weight:700;font-size:1.22em;text-align:center;margin:.1em 0 .4em;letter-spacing:.5px}
+.text .h2{font-weight:700;font-style:italic;text-align:center;margin:0 0 .5em}
+.text .cap{font-style:italic;font-size:.88em;color:#4b3a26;text-align:center;margin:0 0 .7em}
+.text table{border-collapse:collapse;margin:.2em auto .8em;font-size:.92em}
+.text th,.text td{border:3px solid var(--ink);padding:.2em .55em;text-align:left}
+.text th{background:var(--paper2)}
+.text .rowu td{background:#fffaf0}
+.text .pic{display:block;margin:0 auto .3em;width:min(320px,80%);height:auto;border:3px solid var(--ink);border-radius:6px;background:#ddd}
+.k-news .h1{font-family:Georgia,'Times New Roman',serif;font-size:1.4em;border-bottom:4px double var(--ink);padding-bottom:.15em}
+.k-diary .text,.k-notebook .text{background:repeating-linear-gradient(transparent 0 calc(1.5em - 2px),#c9b48a calc(1.5em - 2px) 1.5em);background-attachment:local}
+.k-sign .text .h1,.k-poster .text .h1{color:var(--red)}
+.u{border-radius:6px;transition:background .2s;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.w{cursor:pointer;border-radius:4px}
+.w.said{background:#ffe27a}
+.vocab{text-decoration:underline 3px;text-underline-offset:4px;font-weight:700}
+.u.look{background:#fff1a8;box-shadow:0 0 0 3px #f2c94c}
+.u.proof{background:#b9f0a9;box-shadow:0 0 0 3px #4fae49}
+.u.wrongpick{background:#ffc4bb;box-shadow:0 0 0 3px #d9534f}
+.pick .u{cursor:pointer;background:#fff7dd;box-shadow:0 0 0 2px #e2cf9f;padding:0 .08em}
+.pick .u.sel{background:#ffd76a;box-shadow:0 0 0 4px var(--pumpkin)}
+.map{position:relative;margin:0 auto .8em;width:100%;max-width:600px;aspect-ratio:2/1;border:3px solid var(--ink);border-radius:6px;overflow:hidden}
+.map svg{position:absolute;inset:0;width:100%;height:100%}
+.map .u{position:absolute;font-size:clamp(13px,1.6vw,19px);font-weight:700;background:#fff8e8e6;padding:1px 6px;border:2px solid var(--ink);border-radius:6px;white-space:nowrap;line-height:1.3}
+
+.qpanel{flex:0 1 440px;display:flex;flex-direction:column;background:#fffaf0;border:5px solid var(--ink);border-radius:16px;box-shadow:0 8px 0 #0009;padding:12px;overflow:auto;min-width:0}
+.qhead{display:flex;gap:10px;align-items:flex-start}
+.qhead .tagl{font-size:clamp(14px,1.4vw,17px);font-weight:700;color:#7a5d9e;text-transform:uppercase;letter-spacing:1px}
+.qtext{flex:1;font-size:clamp(20px,2.1vw,26px);font-weight:700;line-height:1.35}
+.qhead .ico{width:50px;height:50px;font-size:22px;border-width:3px;flex:none}
+.opts{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.opt{text-align:left;font-size:clamp(19px,2vw,24px);line-height:1.3;background:#fff;border:4px solid var(--ink);border-radius:14px;box-shadow:0 5px 0 var(--ink);padding:10px 14px;cursor:pointer;min-height:58px;font-weight:700}
+.opt:active{transform:translateY(3px);box-shadow:0 2px 0 var(--ink)}
+.opt.right{background:#9be88f}
+.opt.wrong{background:#ffb3a8;text-decoration:line-through;opacity:.75}
+.opt:disabled{cursor:default}
+.opt .n{display:inline-flex;align-items:center;justify-content:center;width:1.5em;height:1.5em;border-radius:50%;background:var(--plum);color:#fff;margin-right:8px;font-size:.85em}
+.qmsg{min-height:1.4em;margin-top:10px;font-size:clamp(17px,1.8vw,22px);font-weight:700;color:#6b3fa0}
+.qfoot{margin-top:auto;padding-top:8px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.stars-row{font-size:clamp(18px,1.8vw,22px);color:#8a6a2a}
+
+/* ---------- clue board ---------- */
+#board{position:fixed;inset:0;z-index:14;display:none;padding:max(10px,env(safe-area-inset-top,0px)) 14px 14px;background:#4a2f1d;background-image:radial-gradient(#5d3c25 15%,transparent 16%),radial-gradient(#3f2717 15%,transparent 16%);background-size:22px 22px;background-position:0 0,11px 11px;overflow:auto}
+#board.on{display:flex;flex-direction:column;align-items:center}
+#board .bq{background:var(--paper);border:5px solid var(--ink);border-radius:16px;padding:10px 18px;max-width:980px;width:100%;box-shadow:0 6px 0 #0009;text-align:center}
+#board .bq .qtext{text-align:center}
+.pins{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin:14px 0;max-width:1100px}
+.pin{position:relative;width:clamp(170px,18vw,205px);min-height:150px;background:#fffbe9;border:4px solid var(--ink);padding:24px 10px 10px;cursor:pointer;box-shadow:0 6px 0 #0008;font-size:clamp(17px,1.7vw,21px);font-weight:700;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center}
+.pin:nth-child(odd){transform:rotate(-2deg)}.pin:nth-child(even){transform:rotate(1.6deg)}
+.pin::before{content:'';position:absolute;top:6px;left:50%;width:18px;height:18px;margin-left:-9px;border-radius:50%;background:var(--red);box-shadow:0 2px 0 #0007}
+.pin .k{font-size:30px;line-height:1}
+.pin .st{color:#d18b00}
+.pin.sel{background:#ffe08a;outline:6px solid var(--red)}
+.pin.proof{background:#b9f0a9;outline:6px solid #3e9a3a}
+.pin .read{margin-top:auto;font-size:16px;padding:3px 12px;min-height:40px;border-width:3px;box-shadow:0 3px 0 var(--ink)}
+.sus{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:10px 0}
+.sus .opt{min-width:min(420px,90vw);text-align:center}
+
+/* grown-ups */
+.adult{text-align:left;width:min(980px,96vw)}
+.adult h2{text-align:center}
+.skillrow{display:grid;grid-template-columns:minmax(150px,1.2fr) 3fr 140px;gap:10px;align-items:center;margin:6px 0;font-size:clamp(16px,1.6vw,20px)}
+.bar{height:22px;border:3px solid var(--ink);border-radius:12px;background:#fff;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--moss)}
+.bar i.lo{background:var(--red)}.bar i.mid{background:var(--pumpkin)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.chip{border:4px solid var(--ink);border-radius:14px;background:#fff;padding:6px 14px;font-size:clamp(16px,1.6vw,20px);cursor:pointer;font-weight:700;min-height:50px}
+.chip small{display:block;font-weight:400;font-size:.8em}
+.chip.on{background:#ffe08a;outline:4px solid var(--pumpkin)}
+.players{display:grid;gap:10px;width:min(560px,100%);margin:0 auto}
+.player{display:flex;gap:8px;align-items:center;border:4px solid var(--ink);border-radius:14px;background:#fff;padding:6px}
+.player.on{background:#ffe9a3}
+.player .who{flex:1;text-align:left;font-size:22px;font-weight:700;background:none;border:0;cursor:pointer;padding:6px}
+.player .who small{display:block;font-weight:400;font-size:15px}
+.player input{flex:1;font-size:22px;font-family:var(--bd);border:3px solid var(--ink);border-radius:10px;padding:6px 10px}
+.coats{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.coat{width:52px;height:52px;border-radius:50%;border:4px solid var(--ink);cursor:pointer}
+.coat.on{outline:5px solid var(--plum);outline-offset:2px}
+.tricky{font-size:clamp(15px,1.5vw,18px);line-height:1.5}
+.tricky li{margin:4px 0}
+.stars{font-size:clamp(54px,7vw,92px);letter-spacing:8px;color:#e0a100;text-shadow:0 4px 0 var(--ink)}
+.stars .off{color:#0003;text-shadow:none}
+.unmask-card{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);width:min(900px,94vw);z-index:12;display:none}
+.unmask-card.on{display:block}
+.unmask-card p{font-size:clamp(20px,2.2vw,27px);margin:6px auto}
+@media (max-width:900px){
+  #clue{flex-direction:column;overflow:auto}
+  .paper{flex:0 0 auto;max-height:58vh;max-width:none}
+  .qpanel{flex:0 0 auto;max-width:none}
+}
+@media (prefers-reduced-motion:reduce){#act.warn{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Creakwood"></canvas>
+<div id="spots"></div>
+
+<div id="hud"><div class="where" id="where"></div><div class="sp"></div><button class="ico" id="boardBtn" title="Clue Board" aria-label="Clue Board" style="display:none">📌</button><button class="ico" id="menuBtn" title="Menu" aria-label="Menu">⏸</button></div>
+<div id="wick" role="status"><canvas class="face" id="wickFace" width="52" height="64"></canvas><div class="txt" id="wickTxt"></div><button class="ico say" id="wickSay" aria-label="Read it to me">🔊</button></div>
+<button id="act"></button>
+<div id="doorbar"><div class="q" id="doorQ"></div><div class="row"><button class="btn sm" id="doorSay" aria-label="Read the question">🔊</button><button class="btn sm" id="doorRead">📜 Read it again</button></div></div>
+
+<div id="clue" role="dialog" aria-modal="true">
+  <div class="paper" id="paper">
+    <div class="lab"><span id="clueLab"></span><button class="ico" id="readAll" title="Read it to me" aria-label="Read the whole passage">🔊</button></div>
+    <div class="text" id="ptext"></div>
+  </div>
+  <div class="qpanel" id="qpanel"></div>
+</div>
+
+<div id="board"></div>
+<div class="unmask-card card" id="unmaskCard"></div>
+
+<div class="screen clear on" id="sTitle"><div class="card" style="margin-left:auto;margin-right:3vw;max-width:min(620px,94vw)">
+  <h1 class="title">Creakwood</h1>
+  <p style="margin-top:4px">A spooky reading mystery. Read every clue carefully. It's how you get through the night.</p>
+  <div class="cases" id="caseRow"></div>
+  <div class="row"><button class="btn go" id="startBtn">Start the case</button></div>
+  <div class="row"><button class="btn sm" id="playerBtn">👤 Player</button><button class="btn sm hold" id="adultBtn" aria-label="Grown-ups: press and hold">Grown-ups (hold)<i></i></button></div>
+  <div class="small" id="titleInfo"></div>
+</div></div>
+
+<div class="screen" id="sIntro"><div class="card">
+  <div class="small" id="introCap"></div>
+  <h2 id="introTitle"></h2>
+  <p id="introText"></p>
+  <div class="row"><button class="btn sm" id="introSay" aria-label="Read it to me">🔊</button><button class="btn go" id="introGo">Light the lantern</button></div>
+</div></div>
+
+<div class="screen" id="sMenu"><div class="card">
+  <h2>Paused</h2>
+  <div class="row"><button class="btn go" id="resumeBtn">Keep going</button></div>
+  <div class="row"><button class="btn sm" id="soundBtn">Sound: on</button><button class="btn sm" id="quitBtn">Back to the title</button></div>
+  <p class="small">Your case is saved. You can come back to it later.</p>
+</div></div>
+
+<div class="screen" id="sPlayers"><div class="card" id="playersCard"></div></div>
+<div class="screen" id="sAdult"><div class="card adult" id="adultCard"></div></div>
+<div class="screen" id="sDone"><div class="card" id="doneCard"></div></div>
+<script id="cw-content">
+'use strict';
+/* =====================================================================
+   CONTENT. Hand-written passages and questions. scripts/contentcheck.mjs
+   reads this block, so keep it free of DOM code.
+
+   Passage markup (one block per line):
+     # Heading      ## Subheading     ~ caption     @map id     ---  (second note)
+     | a | b | c    table header row (first row without a key)
+     |{key} a | b   table row; the whole row is one tappable unit
+     [[key|text]]   a keyed unit: questions point at keys (look = hint glow,
+                    ev = sentences that prove the answer). Every key a
+                    question uses must exist in the Level 1, 2 and 3 text.
+     _word_         underlined vocabulary word
+   Options: the right one starts with "*".
+   ===================================================================== */
+const SKILLS = {
+  key_detail: 'Key details',
+  main_idea: 'Main idea',
+  sequence: 'Sequence',
+  inference: 'Inference and character',
+  cause_effect: 'Cause and effect',
+  vocab: 'Vocabulary in context',
+  text_features: 'Text features',
+  author_purpose: "Author's purpose",
+  compare: 'Compare two texts',
+};
+const LEVELS = { 1: { name: 'Level 1', grade: 'End of grade 2', min: 40, max: 80 }, 2: { name: 'Level 2', grade: 'Grade 3', min: 80, max: 150 }, 3: { name: 'Level 3', grade: 'Grade 4', min: 150, max: 220 } };
+
+const MAPS = {
+  rail: {
+    w: 600, h: 300,
+    svg: `<rect x="0" y="0" width="600" height="300" fill="#efe2bf"/>
+      <path d="M330 0 C 350 80, 300 160, 340 300" stroke="#6fa3c8" stroke-width="34" fill="none"/>
+      <g fill="#7f9c6b" opacity=".55"><circle cx="230" cy="215" r="26"/><circle cx="270" cy="250" r="30"/><circle cx="200" cy="262" r="22"/><circle cx="160" cy="232" r="18"/></g>
+      <path d="M20 95 L 585 95" stroke="#3b2a1a" stroke-width="7" fill="none"/>
+      <path d="M20 95 L 585 95" stroke="#efe2bf" stroke-width="2" stroke-dasharray="6 9" fill="none"/>
+      <path d="M260 95 C 250 160, 170 170, 150 230" stroke="#3b2a1a" stroke-width="5" stroke-dasharray="11 7" fill="none"/>
+      <rect x="296" y="83" width="80" height="24" fill="#a07a4a" stroke="#3b2a1a" stroke-width="3"/>
+      <rect x="20" y="70" width="40" height="34" fill="#c55" stroke="#3b2a1a" stroke-width="3"/>
+      <rect x="545" y="70" width="40" height="34" fill="#c55" stroke="#3b2a1a" stroke-width="3"/>
+      <circle cx="260" cy="95" r="9" fill="#ffcf4a" stroke="#3b2a1a" stroke-width="3"/>
+      <rect x="128" y="226" width="44" height="30" fill="#8a6a44" stroke="#3b2a1a" stroke-width="3"/>
+      <path d="M240 186 L 300 186 L 270 160 Z" fill="#9b8a6a" stroke="#3b2a1a" stroke-width="3"/>`,
+    labels: [
+      { x: 6, y: 18, key: 'm_station', text: 'Creakwood Station' },
+      { x: 33, y: 41, key: 'm_switch', text: 'Switch 3' },
+      { x: 55, y: 18, key: 'm_bridge', text: 'River Bridge' },
+      { x: 77, y: 41, key: 'm_pine', text: 'Pinehollow' },
+      { x: 13, y: 54, key: 'm_spur', text: 'Hollow Spur' },
+      { x: 3, y: 91, key: 'm_siding', text: 'Hollow Siding' },
+      { x: 46, y: 64, key: 'm_hill', text: 'Crow Hill' },
+    ],
+  },
+};
+
+const CASES = [
+/* ------------------------------------------------------------------ */
+{
+  id: 1, title: 'The Bakery Thief', creature: 'mumbles', creatureName: 'Mumbles',
+  intro: 'The night before the Harvest Moon Fair, the biggest cake in Creakwood vanished from a locked bakery. The fair needs it by noon. Grab your lantern.',
+  wickStart: "Okay. Spooky town, missing cake, and me, a candle. Let's read that note on the bakery door.",
+  scenes: [
+    {
+      id: 'c1s1', name: "Bramble's Bakery", art: 'bakeryStreet',
+      looks: {
+        window: 'Pumpkin bread, apple tarts... and one empty cake stand. Suspicious.',
+        lamp: "This lamppost has seen things. It won't talk. I asked.",
+      },
+      creatureLine: "Did you see that? That's Mumbles, the bakery ghost. He's a sheet with opinions. He likes moving things around.",
+      clue: {
+        kind: 'note', label: 'A note taped to the bakery door', title: 'The note on the door',
+        l1: `# CLOSED
+My moon cake is missing! I made it for the Harvest Moon Fair.
+[[lock|I locked the door at eight and went home.]] [[glasses|On the way, I remembered my reading glasses were still on the counter, so I went back.]] [[gone|At nine, the door was still locked and the windows were shut, but the cake was gone!]]
+[[baffled|I am _baffled_.]] [[how|How could a cake leave a locked room?]]
+Please help me find it.
+Ms. Bramble`,
+        l2: `# CLOSED
+To everyone in Creakwood,
+My moon cake is missing! It is the tall blue cake with silver sprinkles that I baked for the Harvest Moon Fair.
+[[lock|I locked the front door at eight o'clock and started walking home.]] [[glasses|Halfway there, I remembered that my reading glasses were still on the counter, so I hurried back.]] [[gone|When I got here at nine, the door was still locked and every window was shut tight, but the cake was gone.]]
+Pepper, my cat, was asleep in the bread basket. My helper, Toby, had gone home at seven.
+[[baffled|I am _baffled_.]] [[how|How could a cake leave a locked room?]]
+If you find my moon cake, please bring it back. The fair needs it by noon tomorrow.
+Ms. Bramble, Baker`,
+        l3: `# CLOSED (Sorry!)
+To everyone in Creakwood,
+My moon cake is missing! It is the tall blue cake with silver sprinkles, three layers high, that I baked for the Harvest Moon Fair.
+[[lock|I locked the front door at eight o'clock and started walking home.]] The wind was pushing leaves all over the road, and an owl was hooting somewhere in the woods. [[glasses|Halfway there, I remembered that my reading glasses were still on the counter, so I hurried back.]] [[gone|When I got here at nine, the door was still locked and every window was shut tight, but the cake was gone.]] Only the plate was left, with one silver sprinkle in the middle.
+Pepper, my cat, was asleep in the bread basket, snoring like a tiny teakettle. My helper, Toby, had gone home at seven.
+[[baffled|I am _baffled_.]] [[how|How could a cake leave a locked room?]] Cakes do not have legs. I checked.
+If you find my moon cake, please bring it back. The fair needs it by noon tomorrow, and there is no time to bake another one.
+Thank you,
+Ms. Bramble, Baker`,
+        qs: [
+          { id: 'c1s1-back', skill: 'cause_effect', type: 'mc',
+            q: 'Why did Ms. Bramble go back to the bakery?',
+            opts: ['*She had left her glasses there.', 'She wanted to check on the cake.', 'She heard a strange noise inside.', 'She had to feed her cat.'],
+            look: ['glasses'], hint: 'Read the lit-up sentence. What did she remember on her way home?' },
+          { id: 'c1s1-puzzle', skill: 'inference', type: 'mc',
+            q: 'Why is the missing cake such a puzzle?',
+            opts: ['*The bakery was locked up tight, so no one should have gotten in.', 'The cake was too big to eat.', 'Ms. Bramble forgot where she put it.', 'The cake was hiding in the bread basket.'],
+            hint: 'Think about what Ms. Bramble found when she came back at nine o\'clock.',
+            ev: ['gone'] },
+          { id: 'c1s1-baffled', skill: 'vocab', type: 'mc', word: 'baffled',
+            q: 'Ms. Bramble says she is baffled. What does baffled mean?',
+            opts: ['*puzzled, because something makes no sense', 'very sleepy', 'angry at someone', 'excited and happy'],
+            look: ['how'], hint: 'Read the sentence right after it. What question is she asking?' },
+          { id: 'c1s1-main', skill: 'main_idea', type: 'mc', extra: true,
+            q: 'What is this note mostly about?',
+            opts: ['*Ms. Bramble\'s cake vanished, and she wants help finding it.', 'Ms. Bramble forgot her reading glasses.', 'The Harvest Moon Fair is tomorrow.', 'Ms. Bramble locks her bakery every night.'],
+            hint: 'Pick the answer that fits the WHOLE note, not just one part of it.' },
+          { id: 'c1s1-why', skill: 'author_purpose', type: 'mc', extra: true,
+            q: 'Why did Ms. Bramble write this note?',
+            opts: ['*to ask people to help find her cake', 'to tell people what time the fair starts', 'to tell a story about her cat', 'to sell more bread'],
+            hint: 'Read the very end of the note. What is she asking people to do?' },
+        ],
+      },
+    },
+    {
+      id: 'c1s2', name: 'The Kitchen', art: 'kitchen',
+      looks: {
+        jar: 'Spoons in the flour jar. Again.',
+        plate: 'One silver sprinkle on an empty plate. The cake was right here.',
+      },
+      clue: {
+        kind: 'sign', label: 'A sign on the kitchen wall', title: 'Kitchen Rules',
+        l1: `# KITCHEN RULES
+1. Wash your hands.
+2. [[cellar|The cellar door has frost on its window. Keep it shut.]]
+3. [[stairs|The back stairs are behind the big oven, so that door is always warm.]]
+4. [[rickety|The cellar steps are _rickety_.]] [[cracked|Two of them are cracked, so hold the rail.]]
+5. [[spoons|If the spoons are in the flour jar again, put them back.]] [[notyou|I know it was not you.]]
+Ms. Bramble`,
+        l2: `# KITCHEN RULES
+1. Wash your hands before you touch the dough.
+2. [[cellar|The cellar door has frost on its window. Keep it shut so the butter stays cold.]]
+3. [[stairs|The back stairs are right behind the big oven, so that door is always warm.]] Never set frosting near it, or the frosting will melt.
+4. [[rickety|The cellar steps are _rickety_.]] [[cracked|Two of them are cracked, so hold the rail and go slowly.]]
+5. The broom closet door sticks. Give it a hip bump.
+6. [[spoons|If you find the spoons in the flour jar again, just put them back.]] [[notyou|I know it was not you.]]
+Ms. Bramble`,
+        l3: `# KITCHEN RULES
+(Please read these. Yes, you, Toby.)
+1. Wash your hands before you touch the dough. Flour on your sleeves is fine. Mud is not.
+2. [[cellar|The cellar door has frost on its window. Keep it shut so the butter stays cold.]] If you leave it open, the butter gets soft and the pie crusts come out flat and sad.
+3. [[stairs|The back stairs are right behind the big oven, so that door is always warm.]] Never set frosting near it, or the frosting will melt and slide right off the cake.
+4. [[rickety|The cellar steps are _rickety_.]] [[cracked|Two of them are cracked, so hold the rail and go slowly.]] Carry one tray at a time.
+5. The broom closet door sticks. Give it a hip bump, then a polite knock.
+6. [[spoons|If you find the spoons in the flour jar again, just put them back.]] [[notyou|I know it was not you.]] It happens every week, and it is always worse in October.
+Ms. Bramble`,
+        qs: [
+          { id: 'c1s2-rickety', skill: 'vocab', type: 'mc', word: 'rickety',
+            q: 'The sign says the cellar steps are rickety. What does rickety mean?',
+            opts: ['*wobbly and weak', 'slippery and wet', 'very dark', 'brand new'],
+            look: ['cracked'], hint: 'Read the lit-up sentence. What is wrong with two of the steps?' },
+          { id: 'c1s2-spoons', skill: 'inference', type: 'mc',
+            q: 'What does Ms. Bramble think about the spoons in the flour jar?',
+            opts: ['*Someone else keeps moving them.', 'Her helper is being careless.', 'Spoons belong in the flour jar.', 'The spoons are lost for good.'],
+            hint: 'She tells her helper to put the spoons back. Then what does she say to him?',
+            ev: ['notyou'], evq: 'Part B: Tap the sentence that shows she does not blame her helper.' },
+          { id: 'c1s2-why', skill: 'author_purpose', type: 'mc', extra: true,
+            q: 'Why did Ms. Bramble write this sign?',
+            opts: ['*to tell her helpers how to work safely in the kitchen', 'to tell a scary story about the cellar', 'to show what the moon cake looks like', 'to invite people to the fair'],
+            hint: 'Look at the heading and the numbers. Who is supposed to follow these?' },
+          { id: 'c1s2-heading', skill: 'text_features', type: 'mc', extra: true,
+            q: 'Why does each rule on the sign start with a number?',
+            opts: ['*so each rule is easy to find and read one at a time', 'to show how many cakes she baked', 'to show what time to do each thing', 'to show which rule is the most important'],
+            hint: 'Do the numbers tell time, or do they just count the rules?' },
+        ],
+      },
+      doors: {
+        skill: 'inference', id: 'c1s2-door',
+        q: 'The cake went up the back stairs. Which door leads there?',
+        opts: [{ id: 'frost', label: 'Blue door' }, { id: 'glow', label: 'Orange door', right: true }, { id: 'broom', label: 'Gray door' }],
+        look: ['stairs'], hint: 'Read the rule about the back stairs. Why is that door always warm? Look around the kitchen.',
+        reveal: 'It was the orange door. The sign said the back stairs are right behind the big oven, and that door is next to the oven.',
+      },
+    },
+    {
+      id: 'c1s3', name: 'The Back Stairs', art: 'backStairs',
+      looks: {
+        cat: "That's Pepper. She's asleep. Or pretending. Cats are tricky.",
+        step: 'This step squeaks like a mouse with the hiccups.',
+      },
+      clue: {
+        kind: 'diary', label: 'A diary page on the stairs', title: "Pepper's diary",
+        l1: `# Pepper's Diary
+[[nap|I was napping in the bread basket when a soft humming woke me up.]] [[sheet|A white sheet floated right through the kitchen wall.]] [[carry|It scooped up the moon cake and floated up the back stairs.]] [[sprinkles|Silver sprinkles dropped onto every step.]]
+[[brave|I puffed out my tail to look brave, but my whiskers would not stop shaking.]]
+[[hide|Then I hid under the flour sacks until the humming stopped.]]
+[[pride|Cats do not chase sheets. We have our pride.]]
+Pepper`,
+        l2: `# Pepper's Diary
+Dear Diary,
+Tonight was the strangest night of all nine of my lives.
+[[nap|I was napping in the bread basket when a soft, wobbly humming woke me up.]] [[sheet|I peeked over the edge and saw a white sheet float right through the kitchen wall.]] It had two dark eye holes and no feet at all. [[carry|It drifted to the counter, scooped up the big blue moon cake, and floated up the back stairs.]] [[sprinkles|Silver sprinkles dropped onto every step.]]
+[[fur|My fur stood straight up.]] [[brave|I puffed out my tail to look brave, but my whiskers would not stop shaking.]]
+[[hide|Then I hid under the flour sacks until the humming stopped.]]
+I did not chase it. [[pride|Cats do not chase sheets. We have our pride.]]
+Love,
+Pepper`,
+        l3: `# Pepper's Diary
+Dear Diary,
+Tonight was the strangest night of all nine of my lives, and I have had some very strange ones.
+[[nap|I was napping in the bread basket when a soft, wobbly humming woke me up.]] It sounded like a birthday song sung through a mouthful of marshmallows. [[sheet|I peeked over the edge and saw a white sheet float right through the kitchen wall.]] It had two dark eye holes and no feet at all. [[carry|It drifted to the counter, scooped up the big blue moon cake, and floated up the back stairs.]] [[sprinkles|Silver sprinkles dropped onto every step.]] I thought about licking them. I did not.
+[[fur|My fur stood straight up.]] [[brave|I puffed out my tail to look brave, but my whiskers would not stop shaking.]]
+[[hide|Then I hid under the flour sacks until the humming stopped.]] It was dusty under there. I sneezed twice, very quietly.
+I did not chase it. [[pride|Cats do not chase sheets. We have our pride.]] Also, it was very late, and I had a nap to finish.
+Love,
+Pepper`,
+        qs: [
+          { id: 'c1s3-order', skill: 'sequence', type: 'order',
+            q: 'Put these in the order they happened. Tap the first one first.',
+            items: ['A humming sound woke Pepper up.', 'A sheet floated through the wall.', 'The sheet carried the cake up the stairs.', 'Pepper hid under the flour sacks.'],
+            hint: 'Start at the top of the diary and read each part in order.' },
+          { id: 'c1s3-feel', skill: 'inference', type: 'mc',
+            q: 'How did Pepper feel when she saw the sheet?',
+            opts: ['*scared, but trying not to show it', 'brave and not scared at all', 'sleepy and bored', 'excited to chase it'],
+            hint: 'What did Pepper do with her tail? And what were her whiskers doing?',
+            ev: ['brave'], evq: 'Part B: Tap the sentence that shows Pepper was scared but tried to hide it.' },
+          { id: 'c1s3-steps', skill: 'key_detail', type: 'mc',
+            q: 'If you checked the back stairs the next morning, what would you find?',
+            opts: ['*silver sprinkles on the steps', 'muddy paw prints', 'pieces of a torn sheet', 'a trail of spilled flour'],
+            look: ['carry'], hint: 'Read the lit-up sentence, then read the one right after it.' },
+          { id: 'c1s3-pride', skill: 'author_purpose', type: 'mc', extra: true,
+            q: 'Why does Pepper write, "Cats do not chase sheets. We have our pride."?',
+            opts: ['*to give a funny excuse for not chasing it', 'to warn other cats that sheets are dangerous', 'to explain how to catch a ghost', 'to show that cats love sheets'],
+            look: ['pride'], hint: 'Did Pepper chase the sheet? What would a scared cat say so she still sounds cool?' },
+        ],
+      },
+    },
+    {
+      id: 'c1s4', name: 'The Upstairs Hall', art: 'hall',
+      looks: {
+        portrait: 'Somebody keeps turning these paintings upside down. I have a guess who.',
+        mirror: "I'm too short for this mirror. Story of my life.",
+      },
+      clue: {
+        kind: 'news', label: 'A newspaper pinned to the wall', title: 'The newspaper story',
+        l1: `# THE CREAKWOOD CRIER
+## Giant Cake at the Fair
+~ [[cap|Ms. Bramble shows off her moon cake. It is as wide as a wagon wheel.]]
+[[days|Ms. Bramble spent three days making a giant cake for the fair.]] [[noon|It will be cut at noon, right after the pumpkin parade.]]
+[[tin|She keeps her silver sprinkles locked in a tin, because Rook, the crow on her roof, grabs anything shiny.]]
+The fair opens at ten.`,
+        l2: `# THE CREAKWOOD CRIER
+## Giant Cake Will Star at Fair
+~ [[cap|Ms. Bramble shows off her moon cake. It is as wide as a wagon wheel.]]
+This year's Harvest Moon Fair will have the biggest cake Creakwood has ever seen. [[days|Baker Ms. Bramble spent three whole days making it.]]
+[[noon|The cake will be cut at noon, right after the pumpkin parade.]] Everyone in town gets a slice.
+[[tin|Ms. Bramble keeps her silver sprinkles locked in a tin, because Rook, the crow who lives on her roof, grabs anything shiny.]] "That bird took my best spoon last spring," she said. "I am not taking any chances."
+The fair opens at ten o'clock in the town square.`,
+        l3: `# THE CREAKWOOD CRIER
+## Giant Cake Will Star at Fair
+~ [[cap|Ms. Bramble shows off her moon cake. It is as wide as a wagon wheel.]]
+This year's Harvest Moon Fair will have the biggest cake Creakwood has ever seen. [[days|Baker Ms. Bramble spent three whole days making it.]] She used forty eggs, ten pounds of butter, and a secret blue frosting that she will not explain to anyone, not even this reporter.
+[[noon|The cake will be cut at noon, right after the pumpkin parade.]] Everyone in town gets a slice, and the first slice goes to whoever grows the biggest pumpkin.
+[[tin|Ms. Bramble keeps her silver sprinkles locked in a tin, because Rook, the crow who lives on her roof, grabs anything shiny.]] "That bird took my best spoon last spring," she said. "He also took a button, two keys, and a bottle cap. I am not taking any chances."
+The fair opens at ten o'clock in the town square. Bring a blanket and a fork.`,
+        qs: [
+          { id: 'c1s4-caption', skill: 'text_features', type: 'mc',
+            q: 'Read the caption under the picture. What does it tell you?',
+            opts: ['*how big the moon cake is', 'when the fair opens', 'where Rook the crow lives', 'how long the cake took to make'],
+            look: ['cap'], hint: 'The caption is the small slanted line right under the picture. Read only that line.' },
+          { id: 'c1s4-tin', skill: 'cause_effect', type: 'mc',
+            q: 'Why does Ms. Bramble keep her sprinkles locked up?',
+            opts: ['*so the crow can\'t grab the shiny sprinkles', 'so the sprinkles stay cold', 'so Pepper won\'t eat them', 'so they won\'t spill during the parade'],
+            look: ['tin'], hint: 'Read the lit-up sentence. Find the word "because." What comes after it?' },
+          { id: 'c1s4-why', skill: 'author_purpose', type: 'mc',
+            q: 'Why did the newspaper print this story?',
+            opts: ['*to let the town know about the huge cake coming to the fair', 'to warn the town about a ghost', 'to teach people how to bake a cake', 'to make people angry at Rook'],
+            hint: 'Look at the headline at the top. What is the whole story about?' },
+          { id: 'c1s4-main', skill: 'main_idea', type: 'mc', extra: true,
+            q: 'What is this news story mostly about?',
+            opts: ['*a giant cake that will be the star of the fair', 'a crow that steals shiny things', 'what time the fair opens', 'a pumpkin parade'],
+            hint: 'Pick the answer that fits the whole story, not just one sentence.' },
+        ],
+      },
+    },
+    {
+      id: 'c1s5', name: 'The Attic', art: 'attic',
+      looks: {
+        streamers: "Streamers? Up here? Who's having a party?",
+        horse: "A rocking horse. It's rocking. By itself. Totally normal.",
+      },
+      clue: {
+        kind: 'letter', label: 'A letter on an old trunk', title: 'The letter in the attic',
+        l1: `# You Are Invited!
+[[bday|Tonight is my two-hundredth birthday, and I am having a party in the attic.]]
+[[borrow|I borrowed the big blue cake from the kitchen.]] [[oven|I could not bake my own, because the last time I got near the oven, my sheet got a scorch mark.]] [[promise|I will put the cake back before morning. I promise.]]
+[[nobody|Nobody has come to one of my parties in a hundred years.]] [[wait|Every year I hang streamers and wait by the window.]]
+Mumbles`,
+        l2: `# You Are Invited!
+To anyone who finds this,
+[[bday|Tonight is my two-hundredth birthday, and I am having a party up here in the attic.]] There will be streamers, games, and a real cake.
+[[borrow|I borrowed the big blue cake from the kitchen downstairs.]] [[oven|I could not bake my own, because the last time I got near the oven, my sheet got a scorch mark.]] [[promise|I will put the cake back before the baker wakes up. I promise.]]
+[[nobody|Nobody has come to one of my parties in a hundred years.]] [[wait|Every year I hang the streamers and wait by the window.]] Maybe this year someone will knock.
+Please come. You do not have to bring a present. You just have to come.
+Your friend (I hope),
+Mumbles`,
+        l3: `# You Are Invited!
+To anyone who finds this,
+[[bday|Tonight is my two-hundredth birthday, and I am having a party up here in the attic.]] There will be streamers, games, and a real cake. The games are Hide and Seek (I am very good at it) and Guess What Is Under the Sheet (the answer is always me).
+[[borrow|I borrowed the big blue cake from the kitchen downstairs.]] [[oven|I could not bake my own, because the last time I got near the oven, my sheet got a scorch mark.]] I still have the brown spot. [[promise|I will put the cake back before the baker wakes up. I promise.]] I will even put the sprinkles back, one by one.
+[[nobody|Nobody has come to one of my parties in a hundred years.]] [[wait|Every year I hang the streamers and wait by the window.]] I can hear the town singing at the fair, but the songs are never for me. Maybe this year someone will knock.
+Please come. You do not have to bring a present. You just have to come.
+Your friend (I hope),
+Mumbles`,
+        qs: [
+          { id: 'c1s5-feel', skill: 'inference', type: 'mc',
+            q: 'How does Mumbles feel about his birthdays?',
+            opts: ['*lonely, because no one ever comes', 'angry at the baker', 'tired of having parties', 'proud of his cake'],
+            hint: 'What happens every year when Mumbles has a party?',
+            ev: ['nobody', 'wait'] },
+          { id: 'c1s5-bake', skill: 'cause_effect', type: 'mc',
+            q: "Why didn't Mumbles bake his own cake?",
+            opts: ['*Going near the oven once left a burn on his sheet.', "He didn't have enough time.", "He doesn't like the taste of cake.", 'Ms. Bramble told him not to.'],
+            look: ['oven'], hint: 'Read the lit-up sentence. What happened the last time he got near the oven?' },
+          { id: 'c1s5-main', skill: 'main_idea', type: 'mc',
+            q: 'What is this letter mostly about?',
+            opts: ['*Mumbles wants someone to come to his birthday party.', 'Mumbles borrowed a cake from the kitchen.', 'Ghosts like to live in attics.', 'How to hang party streamers.'],
+            hint: 'Look at the heading and the last lines. What does Mumbles hope will happen?' },
+          { id: 'c1s5-plan', skill: 'key_detail', type: 'mc', extra: true,
+            q: 'What does Mumbles plan to do with the cake?',
+            opts: ['*give it back before morning', 'eat the whole thing himself', 'take it to the fair', 'hide it in the cellar'],
+            look: ['promise'], hint: 'Read the lit-up sentence. What does he promise?' },
+        ],
+      },
+    },
+  ],
+  finale: {
+    q: 'Who took the moon cake?',
+    opts: [{ id: 'mumbles', label: 'Mumbles, the sheet ghost', right: true }, { id: 'pepper', label: 'Pepper, the cat' }, { id: 'rook', label: 'Rook, the crow' }, { id: 'toby', label: 'Toby, the helper' }],
+    hint: 'Reread your clues. One of them tells what someone SAW that night.',
+    proof: ['c1s3', 'c1s5'],
+    proofHint: 'Pick the clue from someone who saw it happen, and the clue written by the one who took it.',
+    proofWhy: "Pepper's diary says a white sheet carried the cake upstairs, and Mumbles's letter says he borrowed it.",
+  },
+  unmask: [
+    'Wick held up his flame, and you lifted the sheet off the ghost...',
+    'Underneath was another, smaller sheet.',
+    '"Surprise?" said Mumbles. "I was going to give it back. I just wanted one party."',
+    'Ms. Bramble laughed so hard her glasses fell off. "Then you will have one," she said. "At the fair, with the whole town."',
+    'At noon, the first slice of moon cake went to Mumbles. It fell right through him. He said it was the best cake he never ate.',
+  ],
+},
+/* ------------------------------------------------------------------ */
+{
+  id: 2, title: 'The Lost Train', creature: 'lamplighter', creatureName: 'The Lamplighter',
+  intro: 'Old Number Nine left Creakwood Station last night and never reached Pinehollow. A tall stranger with a lamp walks the empty platform. When Wick flickers, hide.',
+  wickStart: "My flame gets wobbly when someone's coming. If it wobbles, tap HIDE. Now, that timetable looks important.",
+  scenes: [
+    {
+      id: 'c2s1', name: 'Creakwood Station', art: 'platform',
+      looks: {
+        hat: "A conductor's hat on the tracks. Soggy.",
+        clock: 'The station clock says 10:15. The trains here are usually right on time.',
+      },
+      creatureLine: "That's him. The Lamplighter. He's as tall as a house. Let's not say hi.",
+      clue: {
+        kind: 'sign', label: 'The timetable board', title: 'The station timetable',
+        l1: `# CREAKWOOD STATION
+| Train | Leaves Creakwood | Gets to Pinehollow
+|{t9} Old Number Nine (mail) | 9:15 | 9:45
+|{t11} The Owl Express | 11:00 | 11:30
+[[notice|NOTICE: Last night, Old Number Nine never got to Pinehollow.]]
+[[self|It is our little mail train. It drives itself, with no driver at all.]] [[late|It has never once been late.]]
+[[storm|The storm knocked trees onto the roads, so nobody could drive out to look for it.]]`,
+        l2: `# CREAKWOOD STATION
+## Night Trains
+| Train | Leaves Creakwood | Gets to Pinehollow
+|{t5} The Lantern Line | 5:30 | 6:00
+|{t9} Old Number Nine (mail) | 9:15 | 9:45
+|{t11} The Owl Express | 11:00 | 11:30
+[[notice|NOTICE: Last night, Old Number Nine left Creakwood but never got to Pinehollow.]]
+[[self|Old Number Nine is our little mail train. It drives itself, with no driver at all, and it has made the same trip every night for fifty years.]] [[late|In all that time, it has never once been late.]]
+[[storm|Last night's storm knocked trees onto the roads, so nobody could drive out to look for it.]]
+If you see Old Number Nine, please tell the station master.`,
+        l3: `# CREAKWOOD STATION
+## Night Trains
+| Train | Leaves Creakwood | Gets to Pinehollow
+|{t5} The Lantern Line | 5:30 | 6:00
+|{t9} Old Number Nine (mail) | 9:15 | 9:45
+|{t11} The Owl Express | 11:00 | 11:30
+[[notice|NOTICE: Last night, Old Number Nine left Creakwood but never got to Pinehollow.]]
+[[self|Old Number Nine is our little mail train. It drives itself, with no driver at all, and it has made the same trip every night for fifty years.]] [[late|In all that time, it has never once been late.]] It has puffed through snow, fog, and one very confused moose.
+[[storm|Last night's storm knocked trees onto the roads, so nobody could drive out to look for it.]] The Owl Express will not run until we know the tracks are safe.
+The mail sacks on board hold letters, birthday cards, and one box marked FRAGILE: SINGING CAKE.
+If you see Old Number Nine, please tell the station master. And if you see a very tall stranger with a lamp on the platform at night, try not to panic. Nobody knows who he is, but he has never hurt anyone.`,
+        qs: [
+          { id: 'c2s1-table', skill: 'text_features', type: 'mc',
+            q: 'Look at the timetable. When should Old Number Nine have gotten to Pinehollow?',
+            opts: ['*9:45', '9:15', '11:30', '11:00'],
+            look: ['t9'], hint: "Find Old Number Nine's row. Which column tells when a train gets to Pinehollow?" },
+          { id: 'c2s1-late', skill: 'key_detail', type: 'mc',
+            q: "Why is last night's trip so strange for Old Number Nine?",
+            opts: ['*It has always gotten there on time before.', 'It left in the morning instead of at night.', 'It was carrying people instead of mail.', 'It was a brand-new train.'],
+            look: ['late'], hint: 'Read the lit-up sentence. What has Old Number Nine never done?' },
+          { id: 'c2s1-storm', skill: 'cause_effect', type: 'mc',
+            q: "Why didn't anyone go looking for the train last night?",
+            opts: ['*Fallen trees blocked the roads.', 'Everyone was asleep.', 'The train was too fast to catch.', 'The station master said not to.'],
+            look: ['storm'], hint: 'Read the lit-up sentence. What did the storm do?' },
+          { id: 'c2s1-mail', skill: 'key_detail', type: 'mc', extra: true,
+            q: 'What does Old Number Nine carry?',
+            opts: ['*mail for the town', 'people going to Pinehollow', 'trees knocked down by the storm', 'lamps for the station'],
+            look: ['self'], hint: 'Read the lit-up sentence. What kind of train is it?' },
+        ],
+      },
+    },
+    {
+      id: 'c2s2', name: 'The Ticket Office', art: 'ticketOffice',
+      looks: {
+        stove: "A warm stove. I'm a candle. I appreciate a good stove.",
+        window: "The ticket window. Closed. Everything's closed. It's spooky o'clock.",
+      },
+      clue: {
+        kind: 'notes', label: 'Two notes on the counter', title: 'The two notes',
+        l1: `# Conductor Larkspur
+[[cl1|Old Number Nine left at exactly 9:15.]] [[clrain|The rain was coming down sideways.]] [[cl2|Then I saw a tall shape _lurking_ by the tracks.]] [[still|It stood still in the shadows and watched.]] [[cl3|I am sure that stranger stole our train!]]
+---
+# Mr. Pim, Ticket Taker
+[[pim1|The train left at 9:20, not 9:15. I had to drag a branch off the track.]] [[pimrain|I got soaked to my socks.]] [[pim2|Then I heard a loud CLUNK from the signal box.]]`,
+        l2: `# Note from Conductor Larkspur
+[[cl1|I watched Old Number Nine leave the platform at exactly 9:15.]] [[clrain|The rain was coming down sideways, and my hat blew onto the tracks.]] [[cl2|A few minutes later, I saw a tall shape _lurking_ beside the tracks.]] [[still|It stood very still in the shadows, holding a lamp, and it watched the train go by.]] [[cl3|I am sure that stranger stole our train.]]
+---
+# Note from Mr. Pim, Ticket Taker
+[[pim1|Old Number Nine did not leave at 9:15. It left at 9:20, because a branch had fallen across the track and I had to drag it off.]] [[pimrain|I was soaked all the way to my socks.]] I did not see any stranger. [[pim2|A few minutes after the train left, I heard a loud CLUNK from the signal box, like a heavy lever moving.]]`,
+        l3: `# Note from Conductor Larkspur
+[[cl1|I watched Old Number Nine leave the platform at exactly 9:15.]] I know because I checked my pocket watch, and my pocket watch is never wrong. [[clrain|The rain was coming down sideways, and my hat blew onto the tracks.]] [[cl2|A few minutes later, I saw a tall shape _lurking_ beside the tracks.]] [[still|It stood very still in the shadows, holding a lamp, and it watched the train go by.]] Its legs were longer than a ladder. [[cl3|I am sure that stranger stole our train.]]
+---
+# Note from Mr. Pim, Ticket Taker
+[[pim1|Old Number Nine did not leave at 9:15. It left at 9:20, because a branch had fallen across the track and I had to drag it off.]] The conductor's watch has been fast ever since she dropped it in her soup. [[pimrain|I was soaked all the way to my socks.]] I did not see any stranger, but I was busy squeezing out my socks. [[pim2|A few minutes after the train left, I heard a loud CLUNK from the signal box, like a heavy lever moving.]]`,
+        qs: [
+          { id: 'c2s2-agree', skill: 'compare', type: 'mc',
+            q: 'What do BOTH notes agree on?',
+            opts: ['*It was stormy when the train left.', 'A stranger stole the train.', 'The train left at 9:15.', 'Someone moved a lever.'],
+            hint: 'Each wrong answer is in only ONE of the notes. Find the detail that shows up in both.' },
+          { id: 'c2s2-disagree', skill: 'compare', type: 'mc',
+            q: 'What do the two notes disagree about?',
+            opts: ['*what time the train left', 'whether it was raining', 'which train went missing', 'where the train was going'],
+            look: ['cl1', 'pim1'], hint: "Read the first sentence of each note. Do they say the same thing?" },
+          { id: 'c2s2-lurk', skill: 'vocab', type: 'mc', word: 'lurking',
+            q: 'The conductor saw a shape lurking by the tracks. What does lurking mean?',
+            opts: ['*waiting quietly where it is hard to see', 'running away very fast', 'shouting very loudly', 'fixing something that is broken'],
+            look: ['still'], hint: 'Read the lit-up sentence. What was the shape doing, and where?' },
+          { id: 'c2s2-only', skill: 'compare', type: 'mc', extra: true,
+            q: "Which detail is in Mr. Pim's note but NOT in the conductor's note?",
+            opts: ['*a loud noise from the signal box', 'heavy rain', 'a shape by the tracks', 'a train called Old Number Nine'],
+            hint: 'Read the last sentence of each note. Which one tells about something he heard?' },
+          { id: 'c2s2-blame', skill: 'inference', type: 'mc', extra: true,
+            q: 'Why does Conductor Larkspur think the stranger took the train?',
+            opts: ['*She saw him by the tracks right after the train left.', 'The stranger told her he took it.', 'She found his lamp on the train.', 'Mr. Pim told her he saw the stranger.'],
+            look: ['cl2'], hint: 'Read the lit-up sentence. When and where did she see him?' },
+        ],
+      },
+    },
+    {
+      id: 'c2s3', name: 'The Signal Box', art: 'signalBox',
+      looks: {
+        levers: "Don't touch the levers. I mean it. I'm a candle, not an engineer.",
+        cocoa: 'Cold cocoa. Somebody fell asleep on the job.',
+      },
+      clue: {
+        kind: 'log', label: 'A logbook on the desk', title: 'The signal box logbook',
+        l1: `# Signal Box Logbook
+[[e2|9:05 Made cocoa. Sat in my big chair to rest my eyes for one minute.]]
+[[e3|9:40 Woke up! That was NOT one minute.]]
+[[e4|9:41 Lever 3 has been pulled to SIDE TRACK. I did not touch it!]] [[e5|When Lever 3 points to SIDE TRACK, trains leave the main line and roll onto the old Hollow Spur.]]
+[[e6|9:45 Found round holes in the mud, as small as teacups and very far apart.]] [[poles|Something walked here on long poles.]]`,
+        l2: `# Signal Box Logbook
+Signalman: Otis Crane
+[[e1|8:50 Storm getting worse. Rain hitting the window like pebbles.]]
+[[e2|9:05 Made cocoa. Sat down in my big chair to rest my eyes for one minute.]]
+[[e3|9:40 Woke up! That was NOT one minute.]]
+[[e4|9:41 Lever 3 has been pulled to SIDE TRACK. I did not touch it!]] [[e5|When Lever 3 points to SIDE TRACK, trains leave the main line and roll onto the old Hollow Spur.]]
+[[e6|9:45 Went outside with my flashlight. Found round holes in the mud, again and again, each one as small as a teacup and very far apart.]] [[poles|Not boot prints. Something walked here on long poles.]]`,
+        l3: `# Signal Box Logbook
+Signalman: Otis Crane
+[[e1|8:50 Storm getting worse. Rain hitting the window like pebbles.]]
+8:58 Old Number Nine will pass here at about 9:20. Lever 3 is set to MAIN LINE, like always.
+[[e2|9:05 Made cocoa. Sat down in my big chair to rest my eyes for one minute.]]
+[[e3|9:40 Woke up! That was NOT one minute.]] Cocoa is cold. The cat is sitting on my hat.
+[[e4|9:41 Lever 3 has been pulled to SIDE TRACK. I did not touch it!]] [[e5|When Lever 3 points to SIDE TRACK, trains leave the main line and roll onto the old Hollow Spur.]] Nobody has used that track in years.
+[[e6|9:45 Went outside with my flashlight. Found round holes in the mud, again and again, each one as small as a teacup and very far apart.]] [[poles|Not boot prints. Something walked here on long poles.]]
+9:50 Locked the door. Made more cocoa. Did NOT sit in the chair.`,
+        qs: [
+          { id: 'c2s3-order', skill: 'sequence', type: 'order',
+            q: "Put Otis's night in order. Tap the first one first.",
+            items: ['Otis made cocoa.', 'Otis fell asleep in his chair.', 'Otis saw that Lever 3 had moved.', 'Otis found holes in the mud.'],
+            hint: 'Each line of the logbook starts with a time. Read them from the top down.' },
+          { id: 'c2s3-holes', skill: 'inference', type: 'mc',
+            q: 'What made the holes in the mud?',
+            opts: ['*someone walking on stilts', "Otis's boots", 'raindrops', "the train's wheels"],
+            hint: 'Holes far apart, and not boot prints. What kind of walker leaves marks like that?',
+            ev: ['poles'] },
+          { id: 'c2s3-lever', skill: 'cause_effect', type: 'mc',
+            q: 'Why does it matter that Lever 3 was moved?',
+            opts: ['*It sent the train onto a different track.', 'It turned off the station lights.', 'It woke Otis up.', 'It made the storm stop.'],
+            look: ['e5'], hint: 'Read the lit-up sentence. What happens to trains when Lever 3 points to SIDE TRACK?' },
+          { id: 'c2s3-sleep', skill: 'key_detail', type: 'mc', extra: true,
+            q: 'How long did Otis really rest his eyes?',
+            opts: ['*more than half an hour', 'one minute', 'all night long', 'five minutes'],
+            look: ['e2', 'e3'], hint: 'Look at the time he sat down and the time he woke up.' },
+        ],
+      },
+    },
+    {
+      id: 'c2s4', name: 'The Bridge Path', art: 'bridgePath',
+      looks: {
+        river: "Hear that river? It's loud. And close.",
+        goat: "A goat. Just standing here in the dark. Hi, goat.",
+      },
+      clue: {
+        kind: 'sign', label: 'A sign nailed to a post', title: 'The warning sign',
+        l1: `# DANGER! BRIDGE OUT!
+[[washed|The storm washed the middle of the bridge away.]] [[nofloor|The rails are still there, but there is only water under them.]]
+[[dont|Do NOT walk on the bridge path. Do NOT drive a train over it.]]
+[[woods|Do not take the woods path. It goes around in circles.]]
+[[help|If you see me, please do not run away. I am only trying to help.]]
+The Lamplighter`,
+        l2: `# DANGER! BRIDGE OUT!
+[[washed|Last night's storm washed the middle of the river bridge away.]] [[nofloor|The rails are still there, but there is nothing under them but water.]]
+[[dont|Do NOT walk on the bridge path. Do NOT drive a train over it.]]
+[[woods|Do not take the woods path either. It goes around in circles, and the owls there are rude.]]
+[[lamp|I will keep my lamp lit every night until the bridge is fixed.]]
+[[help|If you see me, please do not run away. I am only trying to help.]]
+The Lamplighter`,
+        l3: `# DANGER! BRIDGE OUT!
+[[washed|Last night's storm washed the middle of the river bridge away.]] [[nofloor|The rails are still there, but there is nothing under them but water.]] From far away, it looks fine. Up close, it is a very long drop into a very cold river.
+[[dont|Do NOT walk on the bridge path. Do NOT drive a train over it.]]
+[[woods|Do not take the woods path either. It goes around in circles, and the owls there are rude.]] I walked it for an hour last spring and ended up right back where I started, holding a pinecone I did not remember picking up.
+[[lamp|I will keep my lamp lit every night until the bridge is fixed.]] I have told the station. I have told the mayor. I have told a goat. Only the goat listened.
+[[help|If you see me, please do not run away. I am only trying to help.]]
+The Lamplighter`,
+        qs: [
+          { id: 'c2s4-why', skill: 'author_purpose', type: 'mc',
+            q: 'Why did the Lamplighter put up this sign?',
+            opts: ['*to warn people to stay off the broken bridge', 'to tell people about the rude owls', 'to make people laugh', 'to tell people where the train is'],
+            look: ['dont'], hint: 'Look at the heading in big letters. What does the sign tell people NOT to do?' },
+          { id: 'c2s4-danger', skill: 'cause_effect', type: 'mc',
+            q: 'Why is the bridge dangerous now?',
+            opts: ['*The storm wrecked the middle of it.', 'The rails were taken away.', 'Rude owls live on it.', 'It is too dark to see it.'],
+            hint: 'What did the storm do to the bridge? Careful: the rails are still there.',
+            ev: ['washed', 'nofloor'] },
+          { id: 'c2s4-help', skill: 'inference', type: 'mc', extra: true,
+            q: 'What do the last lines tell you about the Lamplighter?',
+            opts: ['*He is trying to keep people safe, not scare them.', 'He wants people to run away from him.', 'He is the one who broke the bridge.', 'He is angry at the owls.'],
+            look: ['help'], hint: 'Read the lit-up sentence. What is he trying to do?' },
+        ],
+      },
+      doors: {
+        skill: 'inference', id: 'c2s4-door', gates: true,
+        q: 'Three paths start here. Which one is safe to take?',
+        opts: [{ id: 'bridge', label: 'Bridge path' }, { id: 'woods', label: 'Woods path' }, { id: 'rail', label: 'Rail path', right: true }],
+        look: ['dont', 'woods'], hint: 'The sign warns you about two of the paths. Which path does it NOT warn you about?',
+        reveal: 'It was the rail path. The sign said to stay off the bridge path and the woods path, so the rail path is the one left.',
+      },
+    },
+    {
+      id: 'c2s5', name: 'Switch 3', art: 'switchShack',
+      looks: {
+        lamp: 'This lamp is still warm. Someone was here a little while ago.',
+        rails: 'The rails split here. One way goes straight. One way curls off into the trees.',
+      },
+      clue: {
+        kind: 'map', label: 'A map on the shed wall', title: 'The railway map',
+        l1: `# Railway Map
+@map rail
+[[main|The main line goes from Creakwood Station, over the River Bridge, to Pinehollow.]]
+[[spur|At Switch 3, just before the bridge, the Hollow Spur turns off.]]
+[[shed|It ends at an old train shed called Hollow Siding.]]
+[[hidden|The shed is so deep in the woods that you cannot see it from the main line.]]`,
+        l2: `# Map of the Creakwood Railway
+@map rail
+[[main|The main line runs from Creakwood Station, over the River Bridge, and on to Pinehollow.]]
+[[spur|At Switch 3, just before the bridge, the old Hollow Spur turns off toward Crow Hill.]]
+[[shed|The Hollow Spur ends inside an old train shed called Hollow Siding.]] [[years|No trains have used it in thirty years.]]
+[[hidden|The shed is so deep in the woods that you cannot see it from the main line.]]`,
+        l3: `# Map of the Creakwood Railway
+@map rail
+[[main|The main line runs from Creakwood Station, over the River Bridge, and on to Pinehollow.]] It is the fastest way across the river, and the only way most trains ever go.
+[[spur|At Switch 3, just before the bridge, the old Hollow Spur turns off toward Crow Hill.]] It curls around the hill like a sleeping cat's tail.
+[[shed|The Hollow Spur ends inside an old train shed called Hollow Siding.]] [[years|No trains have used it in thirty years.]] The roof leaks, the doors creak, and bats live in the rafters.
+[[hidden|The shed is so deep in the woods that you cannot see it from the main line.]] Even in the daytime, most people forget it is there.
+Map drawn by the Creakwood Railway Club, who meet every Tuesday and would love some new members.`,
+        qs: [
+          { id: 'c2s5-switch', skill: 'text_features', type: 'mc',
+            q: 'Use the map. If a train turns at Switch 3, does it cross the River Bridge?',
+            opts: ['*No. It turns off before it gets to the bridge.', 'Yes. It crosses the bridge first.', 'Yes. It crosses the bridge two times.', 'No. It goes back to Creakwood Station.'],
+            look: ['m_switch', 'm_bridge'], hint: 'On the map, put your finger on Switch 3. Is it on this side of the river or the other side?' },
+          { id: 'c2s5-hidden', skill: 'inference', type: 'mc',
+            q: "Why couldn't anyone spot Old Number Nine from the main line?",
+            opts: ['*Hollow Siding is hidden deep in the woods.', 'The train was painted black.', 'The train was under the river.', 'It was too foggy to see.'],
+            hint: 'Where is the old train shed? Could you see it from the main line?',
+            ev: ['hidden'] },
+          { id: 'c2s5-main', skill: 'main_idea', type: 'mc',
+            q: 'What is this map mostly showing?',
+            opts: ['*where the train tracks around Creakwood go', 'how to walk to Crow Hill', 'where the Lamplighter lives', 'how the bridge was built'],
+            hint: 'Look at the title and the lines on the map. What are most of the lines?' },
+          { id: 'c2s5-years', skill: 'key_detail', type: 'mc', extra: true,
+            q: 'When did a train last use the Hollow Spur, before last night?',
+            opts: ['*about thirty years ago', 'last week', 'fifty years ago', 'every night'],
+            hint: 'Find the sentence that says how long the old track has been empty.' },
+        ],
+      },
+    },
+  ],
+  finale: {
+    q: 'Where is Old Number Nine now?',
+    opts: [{ id: 'siding', label: 'Inside the old shed at Hollow Siding', right: true }, { id: 'river', label: 'At the bottom of the river' }, { id: 'pine', label: 'At Pinehollow Station' }, { id: 'woods', label: 'Going around in circles in the woods' }],
+    hint: 'First find which track the train took. Then find where that track goes.',
+    proof: ['c2s3', 'c2s5'],
+    proofHint: 'One clue shows which track the train was switched onto. Another shows where that track ends.',
+    proofWhy: 'The logbook says Lever 3 sent trains onto the Hollow Spur, and the map shows the Hollow Spur ends at the shed at Hollow Siding.',
+  },
+  unmask: [
+    'The Lamplighter stepped down off his stilts... and kept going down.',
+    'He was the shortest grown-up you have ever seen, and he was wearing fuzzy bunny slippers.',
+    '"I am Wendell Fogg," he said. "I light the station lamps. I need the stilts to reach them."',
+    '"I saw the bridge wash away, so I pulled Lever 3 to send the train somewhere safe. I tried to tell everyone, but every time I waved my lamp, they screamed and ran."',
+    'Old Number Nine was sitting in the old shed at Hollow Siding, safe and dry. The mail arrived the next morning. The conductor gave Mr. Fogg a medal, and a ladder.',
+  ],
+},
+/* ------------------------------------------------------------------ */
+{
+  id: 3, title: 'The Clock Tower', creature: 'tock', creatureName: 'Tock',
+  intro: 'It is 11:59 on Saturday night, and it has been 11:59 for an hour. The great clock in the tower has stopped, and midnight will not come. Something with glowing eyes is watching the stairs.',
+  wickStart: "That's Tock the clockwork owl up there. When his eyes are open, don't move. When they're shut, go! Let's read that poster.",
+  scenes: [
+    {
+      id: 'c3s1', name: 'The Town Square', art: 'square',
+      looks: {
+        fountain: "The fountain's very still. Everything's waiting for midnight.",
+        crate: 'A crate that says NEW BELL. FRAGILE. VERY LOUD.',
+      },
+      creatureLine: 'His head is turning. Freeze when his eyes open!',
+      clue: {
+        kind: 'poster', label: 'A poster on the board', title: "The mayor's poster",
+        l1: `# BIG NEWS FROM THE MAYOR!
+[[when|At midnight this Saturday, a shiny new electric bell will start ringing the hours from the clock tower.]] [[loud|It is loud, it is _modern_, and it never needs winding.]]
+[[tock|Tock, the clockwork owl who has hooted every hour for one hundred years, will retire.]] [[museum|After midnight, Tock will sit in a glass case in the Creakwood Museum.]]
+Mayor Plum`,
+        l2: `# BIG NEWS FROM THE MAYOR!
+## A New Bell for Creakwood
+[[when|At midnight this Saturday, a shiny new electric bell will start ringing the hours from the clock tower.]] [[loud|It is loud, it is _modern_, and it never needs winding.]]
+[[tock|Tock, the clockwork owl who has hooted every hour for one hundred years, will retire.]] [[museum|After midnight, Tock will move to the Creakwood Museum, where he will sit in a glass case for visitors to see.]]
+Thank you, Tock, for a hundred years of hoots!
+Come to the square on Saturday night for cocoa and the very first ring.
+Mayor Plum`,
+        l3: `# BIG NEWS FROM THE MAYOR!
+## A New Bell for Creakwood
+[[when|At midnight this Saturday, a shiny new electric bell will start ringing the hours from the clock tower.]] [[loud|It is loud, it is _modern_, and it never needs winding.]] It can also play three different songs, although the mayor has only learned how to turn on one of them. Tock's very last hoot will be at eleven o'clock, and then he can finally rest.
+[[tock|Tock, the clockwork owl who has hooted every hour for one hundred years, will retire.]] [[museum|After midnight, Tock will move to the Creakwood Museum, where he will sit in a glass case for visitors to see.]] He will have a little sign with his name on it and a soft cushion to sit on.
+Thank you, Tock, for a hundred years of hoots!
+Come to the square on Saturday night for cocoa, music, and the very first ring. Bring earmuffs. The new bell is very loud.
+Mayor Plum`,
+        qs: [
+          { id: 'c3s1-why', skill: 'author_purpose', type: 'mc',
+            q: 'Why did the mayor make this poster?',
+            opts: ['*to tell the town about a change at the clock tower', 'to warn people about a scary owl', 'to sell tickets to the museum', 'to teach people how bells work'],
+            hint: 'Look at the heading. What is the big news?' },
+          { id: 'c3s1-museum', skill: 'key_detail', type: 'mc',
+            q: 'What will happen to Tock after midnight on Saturday?',
+            opts: ['*He will stop hooting and be put on display.', 'He will get a shiny new bell to ring.', 'He will hoot louder than before.', 'He will be taken apart and fixed.'],
+            look: ['tock', 'museum'], hint: 'Read the two lit-up sentences about Tock.' },
+          { id: 'c3s1-modern', skill: 'vocab', type: 'mc', word: 'modern',
+            q: 'The poster says the new bell is modern. What does modern mean?',
+            opts: ['*new and up to date', 'very old', 'very quiet', 'broken'],
+            look: ['when'], hint: 'Read the lit-up sentence. What kind of bell is it? Compare it with Tock, who is one hundred years old.' },
+          { id: 'c3s1-main', skill: 'main_idea', type: 'mc', extra: true,
+            q: 'What is this poster mostly about?',
+            opts: ['*A new bell will take over from Tock at midnight on Saturday.', 'Tock has hooted for a hundred years.', 'There will be cocoa in the square.', 'Museums have glass cases.'],
+            hint: 'Pick the answer that covers the whole poster, not just one line.' },
+        ],
+      },
+    },
+    {
+      id: 'c3s2', name: 'The Tower Door', art: 'towerBase',
+      looks: {
+        bench: 'A bench with a plaque: "Rest your feet. The stairs are worse."',
+        cart: 'A wheelbarrow full of oil cans and a very small broom.',
+      },
+      clue: {
+        kind: 'sign', label: 'A brass plaque by the doors', title: 'How to wind the clock',
+        l1: `# How to Wind the Great Clock
+[[door|The stairs are behind the only tower door with no lock, because the clock must be wound every day.]]
+[[s1|First, climb the steps to the gear room.]]
+[[s2|Next, turn the big brass crank twenty times.]]
+[[s3|Then, check that the pendulum is swinging.]]
+[[s4|Last, wait for the big hand to click. Tock will blink, and you are done.]]
+[[dont|Never wind past twenty turns, or the spring could snap.]]`,
+        l2: `# How to Wind the Great Clock
+by Ida Thimble, Clockmaker
+[[door|The stairs are behind the only tower door with no lock on it, because the clock must be wound every single day.]]
+[[s1|First, climb all ninety-nine steps to the gear room.]]
+[[s2|Next, find the big brass crank and turn it twenty times.]]
+[[s3|Then, check that the pendulum is swinging. If it is still, give it a gentle push.]]
+[[s4|Last, wait for the big hand to click. When it does, Tock will blink, and you are done.]]
+[[dont|Never wind the clock past twenty turns. The spring inside could snap, and the clock would stop for good.]]`,
+        l3: `# How to Wind the Great Clock
+by Ida Thimble, Clockmaker
+[[door|The stairs are behind the only tower door with no lock on it, because the clock must be wound every single day.]] The other two doors lead to the broom cupboard and the room where we keep the holiday lights. Both are locked, and both are very boring.
+[[s1|First, climb all ninety-nine steps to the gear room.]] Count them if you like. I always lose track around sixty.
+[[s2|Next, find the big brass crank and turn it twenty times.]]
+[[s3|Then, check that the pendulum is swinging. If it is still, give it a gentle push.]]
+[[s4|Last, wait for the big hand to click. When it does, Tock will blink, and you are done.]]
+[[dont|Never wind the clock past twenty turns. The spring inside could snap, and the clock would stop for good.]]
+If Tock glares at you, glare back. He respects that.`,
+        qs: [
+          { id: 'c3s2-order', skill: 'sequence', type: 'order',
+            q: 'Put the steps for winding the clock in order. Tap the first one first.',
+            items: ['Climb up to the gear room.', 'Turn the crank twenty times.', 'Make sure the pendulum is swinging.', 'Wait for Tock to blink.'],
+            hint: 'Look for the words First, Next, Then, and Last.' },
+          { id: 'c3s2-twenty', skill: 'cause_effect', type: 'mc',
+            q: 'Why should you never wind the clock more than twenty turns?',
+            opts: ['*A part inside could break.', 'Tock would wake up and hoot.', 'The bell would ring too loudly.', 'Your arms would get too tired.'],
+            look: ['dont'], hint: 'Read the lit-up sentence. What could happen to the spring?' },
+          { id: 'c3s2-words', skill: 'text_features', type: 'mc', extra: true,
+            q: 'Why do the steps begin with First, Next, Then, and Last?',
+            opts: ['*to show the order to do them in', 'to show which steps are hardest', 'to make the steps rhyme', 'to show how long each step takes'],
+            hint: 'What do the words First and Last tell you about the steps?' },
+        ],
+      },
+      doors: {
+        skill: 'inference', id: 'c3s2-door',
+        q: 'Which door leads to the tower stairs?',
+        opts: [{ id: 'pad', label: 'Door with a padlock' }, { id: 'chain', label: 'Door with a chain' }, { id: 'plain', label: 'Door with just a handle', right: true }],
+        look: ['door'], hint: 'Read the sentence about the stairs. What does the stairs door NOT have?',
+        reveal: 'It was the door with just a handle. The plaque said the stairs door is the only one with no lock.',
+      },
+    },
+    {
+      id: 'c3s3', name: 'The Stairs', art: 'towerStairs',
+      looks: {
+        step: "Step sixty-one. Or sixty-two. I've lost count.",
+        lamp: 'A big lamp. A big owl shadow. Hmm.',
+      },
+      clue: {
+        kind: 'notebook', label: 'A notebook left on a step', title: "The clockmaker's notebook",
+        l1: `# From Ida Thimble's Notebook
+[[eyes|Every time the big hand clicks, Tock's eyes snap shut for a moment, and he cannot see a thing.]]
+[[wound|I wound the clock at noon today, like always.]]
+[[shadow|At night, Tock likes to sit in front of the big lamp, so his shadow looks _enormous_ on the wall.]] [[fierce|He thinks it makes him look fierce.]] [[potato|It mostly makes him look like a very large potato with ears.]]`,
+        l2: `# From Ida Thimble's Notebook
+Tock is the oldest clockwork owl in the world, and the grumpiest. My grandmother built him.
+[[eyes|Every time the big hand clicks, Tock's eyes snap shut for a moment, and he cannot see a thing.]] [[open|The rest of the time, his eyes are wide open, and his head turns all the way around to watch the stairs.]]
+[[wound|I wound the clock at noon today, like always. Twenty turns, not one more.]]
+[[shadow|At night, Tock likes to sit in front of the big lamp, so his shadow looks _enormous_ on the wall.]] [[fierce|He thinks it makes him look fierce.]] [[potato|It mostly makes him look like a very large potato with ears.]]`,
+        l3: `# From Ida Thimble's Notebook
+Tock is the oldest clockwork owl in the world, and the grumpiest. My grandmother built him, and he has been complaining ever since.
+[[eyes|Every time the big hand clicks, Tock's eyes snap shut for a moment, and he cannot see a thing.]] [[open|The rest of the time, his eyes are wide open, and his head turns all the way around to watch the stairs.]] Sneaking past him is like a very slow game of freeze tag.
+[[wound|I wound the clock at noon today, like always. Twenty turns, not one more.]]
+[[shadow|At night, Tock likes to sit in front of the big lamp, so his shadow looks _enormous_ on the wall.]] [[fierce|He thinks it makes him look fierce.]] [[potato|It mostly makes him look like a very large potato with ears.]]
+I have never told him this. He would sulk for a week. Last winter he refused to hoot for three days because I dusted him with the wrong brush.`,
+        qs: [
+          { id: 'c3s3-eyes', skill: 'key_detail', type: 'mc',
+            q: 'When is Tock unable to see?',
+            opts: ['*for just a moment, whenever the big hand clicks', 'all night long', 'whenever his head turns around', 'only at noon'],
+            look: ['eyes'], hint: 'Read the lit-up sentence. When do his eyes snap shut?' },
+          { id: 'c3s3-shadow', skill: 'cause_effect', type: 'mc',
+            q: "Why does Tock's shadow look so big?",
+            opts: ['*He sits in front of a bright lamp.', 'He is really a giant owl.', 'The moon is shining on him.', 'He puffs up his feathers.'],
+            look: ['shadow'], hint: 'Read the lit-up sentence. Where does Tock like to sit at night?' },
+          { id: 'c3s3-potato', skill: 'inference', type: 'mc',
+            q: "What does Ida really think of Tock's 'fierce' shadow?",
+            opts: ['*It looks more silly than scary.', 'It frightens her.', 'It makes Tock look tiny.', 'It needs a bigger lamp.'],
+            hint: 'Tock thinks his shadow looks fierce. Read what Ida says right after that.',
+            ev: ['potato'] },
+          { id: 'c3s3-enormous', skill: 'vocab', type: 'mc', word: 'enormous', extra: true,
+            q: "Tock's shadow looks enormous on the wall. What does enormous mean?",
+            opts: ['*very, very big', 'very dark', 'blurry and fuzzy', 'very fast'],
+            look: ['potato'], hint: 'Read the lit-up sentence. Is a very large potato big or small?' },
+        ],
+      },
+    },
+    {
+      id: 'c3s4', name: 'The Gear Room', art: 'gearRoom',
+      looks: {
+        crank: 'The big brass crank. Twenty turns, not one more.',
+        pendulum: 'The pendulum is stuck in the middle of a swing.',
+      },
+      clue: {
+        kind: 'note', label: 'A tiny note stuck in the gears', title: 'The note in the gears',
+        l1: `# (a tiny note, stuck in the gears)
+[[jam|I put my spare brass feather between the gears at 11:59, and the big hand stopped.]]
+[[reason|If the clock never reaches midnight, then Saturday midnight never comes, and nobody can put me in a glass box.]]
+[[nobody|In a museum, nobody needs to know what time it is.]] [[for|What would I even be for?]]
+Tock`,
+        l2: `# (a tiny note, stuck between two gears)
+To whoever is reading this,
+[[jam|I put my spare brass feather between the gears at 11:59, and the big hand stopped.]] I am sorry about the bell.
+[[reason|If the clock never reaches midnight, then Saturday midnight never comes, and nobody can put me in a glass box.]]
+[[hoot|For one hundred years, I have hooted every hour so the bakers know when to bake and the trains know when to go.]] [[nobody|In a museum, nobody needs to know what time it is.]] [[for|What would I even be for?]]
+Please do not take out the feather.
+Tock`,
+        l3: `# (a tiny note, stuck between two gears)
+To whoever is reading this,
+[[jam|I put my spare brass feather between the gears at 11:59, and the big hand stopped.]] I am sorry about the bell. I am a little sorry about the bakers, too, who are probably very confused about their bread.
+[[reason|If the clock never reaches midnight, then Saturday midnight never comes, and nobody can put me in a glass box.]]
+[[hoot|For one hundred years, I have hooted every hour so the bakers know when to bake and the trains know when to go.]] [[nobody|In a museum, nobody needs to know what time it is.]] [[for|What would I even be for?]] I would just sit on a cushion while people tap on the glass and say, "Look, a potato."
+Please do not take out the feather. I only have two, and this is the good one. The other one is bent from the time I sat on it.
+Tock`,
+        qs: [
+          { id: 'c3s4-afraid', skill: 'inference', type: 'mc',
+            q: 'Why does Tock not want to go to the museum?',
+            opts: ['*He would not have a job or be useful anymore.', 'He is afraid of glass.', 'Museums are too cold for owls.', 'He does not like visitors.'],
+            hint: 'What does Tock say about time in a museum? What question does he ask?',
+            ev: ['nobody', 'for'] },
+          { id: 'c3s4-main', skill: 'main_idea', type: 'mc',
+            q: "What is Tock's note mostly about?",
+            opts: ['*why Tock stopped the clock', 'how to fix a stopped clock', 'what time the trains leave', 'where Tock keeps his feathers'],
+            hint: 'Read the whole note. What did Tock do, and why did he do it?' },
+          { id: 'c3s4-stop', skill: 'cause_effect', type: 'mc',
+            q: 'What made the big hand stop?',
+            opts: ['*Something was stuck in the gears.', 'The spring inside snapped.', 'Nobody wound the clock.', 'The lamp went out.'],
+            look: ['jam'], hint: 'Read the lit-up sentence. What did Tock put between the gears?' },
+        ],
+      },
+    },
+    {
+      id: 'c3s5', name: 'The Belfry', art: 'belfry',
+      looks: {
+        bell: "The new bell. It's very shiny. And very... quiet. For now.",
+        window: "You can see all of Creakwood from up here. Everyone's waiting for midnight.",
+      },
+      clue: {
+        kind: 'news', label: 'An old newspaper in a frame', title: 'The old newspaper',
+        l1: `# THE CREAKWOOD CRIER
+~ [[cap|Clockmaker Rosa Thimble holds up Tock, who is about the size of a teacup.]]
+[[date|October 31, 1926]]
+[[first|Last night, the new tower clock struck midnight, and a little brass owl named Tock hooted twelve times.]] [[cheer|The crowd cheered so loudly that a cow in the next town fell over.]] [[fine|(She is fine.)]]
+The whole town gave one penny each to pay for the clock.`,
+        l2: `# THE CREAKWOOD CRIER
+## Owl Clock Hoots Its First Hour!
+~ [[cap|Clockmaker Rosa Thimble holds up Tock, who is about the size of a teacup.]]
+[[date|October 31, 1926]]
+[[first|Last night, Creakwood's new tower clock struck midnight for the first time, and a little brass owl named Tock hooted twelve times.]] [[cheer|The crowd in the square cheered so loudly that a cow in the next town fell over.]] [[fine|(She is fine.)]]
+[[promise|"Tock will hoot every hour," said Rosa Thimble. "As long as this clock keeps running, Creakwood will never lose track of time."]]
+The clock was paid for by the people of Creakwood, who each gave one penny.`,
+        l3: `# THE CREAKWOOD CRIER
+## Owl Clock Hoots Its First Hour!
+~ [[cap|Clockmaker Rosa Thimble holds up Tock, who is about the size of a teacup.]]
+[[date|October 31, 1926]]
+[[first|Last night, Creakwood's new tower clock struck midnight for the first time, and a little brass owl named Tock hooted twelve times.]] [[cheer|The crowd in the square cheered so loudly that a cow in the next town fell over.]] [[fine|(She is fine.)]]
+Mrs. Thimble spent four years building the clock in her kitchen. She says Tock's hoot is tuned to sound just like her grandfather's snore. Tock sits on a little brass perch just under the clock face, where he can see the whole square.
+[[promise|"Tock will hoot every hour," said Rosa Thimble. "As long as this clock keeps running, Creakwood will never lose track of time."]]
+The clock was paid for by the people of Creakwood, who each gave one penny. The mayor gave two pennies and asked everyone to notice.`,
+        qs: [
+          { id: 'c3s5-caption', skill: 'text_features', type: 'mc',
+            q: 'Read the caption under the picture. What does it tell you about Tock?',
+            opts: ['*He is very small.', 'He hooted twelve times.', 'He lives in a museum.', 'He was afraid of the crowd.'],
+            look: ['cap'], hint: 'The caption is the small slanted line under the picture. Read only that line.' },
+          { id: 'c3s5-cheer', skill: 'inference', type: 'mc',
+            q: "How did the people in the square feel about Tock's first hoot?",
+            opts: ['*thrilled', 'frightened', 'bored', 'grumpy'],
+            hint: 'What did the crowd do when Tock hooted? How loud were they?',
+            ev: ['cheer'] },
+          { id: 'c3s5-fine', skill: 'author_purpose', type: 'mc',
+            q: 'Why did the writer add "(She is fine.)" after the part about the cow?',
+            opts: ["*to let readers know, in a funny way, that the cow wasn't hurt", "to tell readers the cow's name", 'to warn readers about loud clocks', 'to show that cows like owls'],
+            look: ['cheer', 'fine'], hint: 'Read the two lit-up parts together. Who is "she"?' },
+          { id: 'c3s5-main', skill: 'main_idea', type: 'mc', extra: true,
+            q: 'What is this old newspaper story mostly about?',
+            opts: ['*Tock hooting the hour for the very first time', 'a cow that fell over', 'how many pennies the clock cost', 'the year 1926'],
+            hint: 'Look at the headline. Pick the answer that covers the whole story.' },
+        ],
+      },
+    },
+  ],
+  finale: {
+    q: 'Why did the great clock stop at 11:59?',
+    opts: [{ id: 'tock', label: 'Tock stopped it so midnight would never come and he could stay', right: true }, { id: 'rust', label: 'The rain made the gears rusty' }, { id: 'wind', label: 'The clockmaker forgot to wind it' }, { id: 'bell', label: 'The new bell was too heavy for the tower' }],
+    hint: 'Which clue tells what would happen at midnight? Which clue tells who stopped the clock?',
+    proof: ['c3s1', 'c3s4'],
+    proofHint: 'Pick the clue that tells what was going to happen to Tock at midnight, and the clue Tock wrote himself.',
+    proofWhy: "The mayor's poster says Tock goes to the museum after midnight, and Tock's note says he jammed the gears so midnight would never come.",
+  },
+  unmask: [
+    'Wick held his flame up high. The giant owl shadow on the wall shrank... and shrank... and shrank.',
+    'Tock was no bigger than a teacup. The huge shadow was just Tock standing in front of the lamp.',
+    '"Please don\'t put me in a glass box," Tock said, in a tiny voice like a music box.',
+    'The mayor scratched his head. "What if the new bell just rings," he said, "and Tock still does the hooting?"',
+    'Mrs. Thimble took out the feather. At midnight the new bell went BONG, Tock went HOO, and the whole town cheered for the hoot.',
+  ],
+},
+];
+
+/* ---------------- passage parsing, shared with scripts/contentcheck.mjs ---------------- */
+const SENT_SPLIT = /(?<=(?<!\b(?:Ms|Mr|Mrs|Dr|St))[.!?]["')]?)\s+(?=["'(A-Z0-9])/;
+function parsePassage(src) {
+  const blocks = [], units = [];
+  let col = 0, sawHeader = false;
+  const addUnit = (key, text) => { const u = { i: units.length, key: key || null, text }; units.push(u); return u; };
+  const split = body => {
+    const out = [], re = /\[\[(\w+)\|([\s\S]*?)\]\]/g;
+    let last = 0, m;
+    const plain = s => s.trim() && s.trim().split(SENT_SPLIT).forEach(t => t.trim() && out.push(addUnit(null, t.trim())));
+    while ((m = re.exec(body))) { plain(body.slice(last, m.index)); out.push(addUnit(m[1], m[2].trim())); last = re.lastIndex; }
+    plain(body.slice(last));
+    return out;
+  };
+  for (const raw of src.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line === '---') { col++; sawHeader = false; blocks.push({ t: 'sep', col }); continue; }
+    if (line.startsWith('@map ')) {
+      const id = line.slice(5).trim(), map = MAPS[id];
+      blocks.push({ t: 'map', col, id, units: map.labels.map(l => Object.assign(addUnit(l.key, l.text), { x: l.x, y: l.y })) });
+      continue;
+    }
+    if (line.startsWith('|')) {
+      let rest = line.slice(1), key = null;
+      const km = rest.match(/^\{(\w+)\}\s*/);
+      if (km) { key = km[1]; rest = rest.slice(km[0].length); }
+      const cells = rest.split('|').map(s => s.trim()).filter(Boolean);
+      if (!key && !sawHeader) { sawHeader = true; blocks.push({ t: 'th', col, cells }); continue; }
+      blocks.push({ t: 'row', col, cells, units: [addUnit(key, cells.join(', '))] });
+      continue;
+    }
+    let t = 'p', body = line;
+    if (line.startsWith('## ')) { t = 'h2'; body = line.slice(3); }
+    else if (line.startsWith('# ')) { t = 'h1'; body = line.slice(2); }
+    else if (line.startsWith('~ ')) { t = 'cap'; body = line.slice(2); }
+    blocks.push({ t, col, units: split(body) });
+  }
+  return { blocks, units, cols: col + 1 };
+}
+const plainText = s => s.replace(/_(\w+)_/g, '$1');
+const wordsIn = s => plainText(s).split(/\s+/).filter(w => /[A-Za-z0-9]/.test(w)).length;
+function wordCount(p) {
+  let n = 0;
+  for (const b of p.blocks) {
+    if (b.t === 'th') n += wordsIn(b.cells.join(' '));
+    else if (b.t === 'row') n += wordsIn(b.cells.join(' '));
+    else if (b.units) n += b.units.reduce((a, u) => a + wordsIn(u.text), 0);
+  }
+  return n;
+}
+if (typeof module !== 'undefined') module.exports = { CASES, SKILLS, LEVELS, MAPS, parsePassage, wordCount, plainText };
+</script>
+<script>
+'use strict';
+/* =====================================================================
+   Setup and helpers
+   ===================================================================== */
+const QS = new URLSearchParams(location.search);
+const DEBUG = QS.has('debug');
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+let FAST = 1;                                   // tests speed up walking and waits
+const later = ms => new Promise(r => setTimeout(r, ms / FAST));
+
+/* =====================================================================
+   Saves: one per player, like Door Codes. Player 1 keeps creakwood.v1.
+   ===================================================================== */
+const PKEY = 'creakwood.players';
+const saveKey = id => id === 'p1' ? 'creakwood.v1' : `creakwood.v1.${id}`;
+const COATS = ['#ffd23f', '#ff7a4a', '#4fb0ff', '#62d26f', '#c77dff', '#ff8fc7'];
+let P = { list: [{ id: 'p1', name: '' }], cur: 'p1' };
+try { const s = JSON.parse(localStorage.getItem(PKEY)); if (s && Array.isArray(s.list) && s.list.length) P = s; } catch (e) { }
+function savePlayers() { try { localStorage.setItem(PKEY, JSON.stringify(P)); } catch (e) { } }
+const playerName = pl => pl.name || `Player ${P.list.indexOf(pl) + 1}`;
+const curPlayer = () => P.list.find(x => x.id === P.cur) || P.list[0];
+function fresh() {
+  return {
+    settings: { level: 2, readAloud: false, sound: true },
+    coat: COATS[0], unlocked: 1, solved: {}, sel: 1,
+    box: {},          // question id -> Leitner box 0..4
+    miss: {},         // question id -> times missed on the first try
+    skills: {},       // skill -> { n, ok } first-try accuracy ("evidence" = Part B taps)
+    run: null,        // the case in progress
+    days: {},
+  };
+}
+function load(id) {
+  let s = fresh();
+  try {
+    const v = JSON.parse(localStorage.getItem(saveKey(id)));
+    if (v && typeof v === 'object') { s = Object.assign(fresh(), v); s.settings = Object.assign(fresh().settings, v.settings || {}); }
+  } catch (e) { }
+  return s;
+}
+let save = load(curPlayer().id);
+function persist() { try { localStorage.setItem(saveKey(P.cur), JSON.stringify(save)); } catch (e) { } }
+function switchPlayer(id) { persist(); P.cur = id; savePlayers(); save = load(id); }
+addEventListener('pagehide', persist);
+
+/* =====================================================================
+   Sound: all synthesized
+   ===================================================================== */
+let AC = null, MG = null, NB = null;
+function ac() {
+  if (!save.settings.sound) return null;
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); MG = AC.createGain(); MG.gain.value = .55; MG.connect(AC.destination); } catch (e) { return null; } }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, d, { type = 'sine', v = .15, slide = 0, delay = 0 } = {}) {
+  const a = ac(); if (!a) return;
+  const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.linearRampToValueAtTime(Math.max(20, f + slide), t + d);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + .015); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g).connect(MG); o.start(t); o.stop(t + d + .03);
+}
+function noise(d, { v = .2, freq = 1200, delay = 0, q = 1 } = {}) {
+  const a = ac(); if (!a) return;
+  if (!NB) { NB = a.createBuffer(1, a.sampleRate, a.sampleRate); const c = NB.getChannelData(0); for (let i = 0; i < c.length; i++) c[i] = Math.random() * 2 - 1; }
+  const t = a.currentTime + delay, s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = NB; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  s.connect(f).connect(g).connect(MG); s.start(t); s.stop(t + d + .03);
+}
+const SFX = {
+  tap() { tone(660, .06, { type: 'triangle', v: .08 }); },
+  step() { noise(.05, { v: .05, freq: 400 }); },
+  page() { noise(.25, { v: .12, freq: 2500, q: .6 }); },
+  ding() { tone(784, .14, { type: 'triangle', v: .14 }); tone(1175, .3, { type: 'triangle', v: .12, delay: .1 }); },
+  buzz() { tone(150, .28, { type: 'sawtooth', v: .07, slide: -40 }); },
+  creak() { tone(140, .7, { type: 'sawtooth', v: .06, slide: 90 }); tone(190, .5, { type: 'triangle', v: .05, slide: -60, delay: .2 }); },
+  whoosh() { noise(.6, { v: .3, freq: 700, q: .4 }); },
+  boo() { tone(330, .5, { type: 'triangle', v: .15, slide: -160 }); tone(220, .5, { type: 'sine', v: .1, slide: -90 }); },
+  giggle() { [0, .09, .18].forEach(d => tone(900 - d * 900, .07, { type: 'sine', v: .06, delay: d })); },
+  shoo() { noise(.4, { v: .25, freq: 1600 }); tone(260, .4, { type: 'square', v: .06, slide: -100 }); },
+  hoot() { tone(420, .32, { v: .2, slide: -60 }); tone(400, .45, { v: .2, slide: -80, delay: .4 }); },
+  tick() { noise(.03, { v: .12, freq: 3200, q: 4 }); },
+  pin() { tone(1200, .05, { type: 'square', v: .06 }); tone(1600, .08, { type: 'square', v: .05, delay: .05 }); },
+  whistle() { tone(880, .5, { type: 'triangle', v: .08 }); tone(1100, .5, { type: 'triangle', v: .06 }); },
+  win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, .3, { type: 'triangle', v: .12, delay: i * .14 })); },
+};
+
+/* =====================================================================
+   Read aloud (speechSynthesis): single words always, questions always,
+   whole passages only when the Grown-ups toggle is on.
+   ===================================================================== */
+let voice = null;
+function pickVoice() {
+  try {
+    const vs = speechSynthesis.getVoices();
+    voice = vs.find(v => /en[-_]US/i.test(v.lang) && /samantha|google|female|zira|aria|jenny|ava/i.test(v.name)) || vs.find(v => /^en/i.test(v.lang)) || null;
+  } catch (e) { voice = null; }
+}
+if ('speechSynthesis' in window) { pickVoice(); try { speechSynthesis.onvoiceschanged = pickVoice; } catch (e) { } }
+let lastSaid = '';
+function speak(t, rate = .85) {
+  lastSaid = t;
+  if (!t || !('speechSynthesis' in window)) return;
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); if (voice) u.voice = voice; u.rate = rate; speechSynthesis.speak(u); } catch (e) { }
+}
+function hush() { try { speechSynthesis.cancel(); } catch (e) { } }
+
+/* =====================================================================
+   Canvas
+   ===================================================================== */
+const cv = $('c'); let ctx = cv.getContext('2d');
+const W = 1440, H = 1000, FLOOR = 880;
+let DPR = 1, SC = 1, OX = 0, OY = 0;
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(innerWidth * DPR); cv.height = Math.round(innerHeight * DPR);
+  SC = Math.min(innerWidth / W, innerHeight / H); OX = (innerWidth - W * SC) / 2; OY = (innerHeight - H * SC) / 2;
+  layoutSpots();
+}
+addEventListener('resize', resize);
+const toWorld = (cx, cy) => ({ x: (cx - OX) / SC, y: (cy - OY) / SC });
+const toScreen = (x, y) => ({ x: OX + x * SC, y: OY + y * SC });
+
+const INK = '#1b1226';
+function R(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
+function rr(x, y, w, h, r, fill, stroke, lw = 5) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } }
+function circ(x, y, r, fill, stroke, lw = 5) { ctx.beginPath(); ctx.arc(x, y, Math.max(.1, r), 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } }
+function ell(x, y, rx, ry, fill, stroke, lw = 5, rot = 0) { ctx.beginPath(); ctx.ellipse(x, y, Math.max(.1, rx), Math.max(.1, ry), rot, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } }
+function poly(pts, fill, stroke, lw = 5) { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.lineJoin = 'round'; ctx.stroke(); } }
+function line(x1, y1, x2, y2, c, lw = 5) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineWidth = lw; ctx.strokeStyle = c; ctx.lineCap = 'round'; ctx.stroke(); }
+function txt(s, x, y, size, c, align = 'center', font = 'Andika, sans-serif', weight = '700') { ctx.font = `${weight} ${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillStyle = c; ctx.fillText(s, x, y); }
+function glowAt(x, y, r, c) { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+// deterministic sprinkle of stars etc.
+function seeded(n, seed) { let s = seed; const r = () => (s = (s * 9301 + 49297) % 233280) / 233280; return Array.from({ length: n }, () => [r(), r(), r()]); }
+const STARS = seeded(70, 7);
+
+/* ---------- backgrounds ---------- */
+function sky(top = '#0d0b25', bot = '#3a2a5e', moon = [1190, 150]) {
+  const g = ctx.createLinearGradient(0, 0, 0, FLOOR); g.addColorStop(0, top); g.addColorStop(1, bot); ctx.fillStyle = g; ctx.fillRect(0, 0, W, FLOOR);
+  for (const [a, b, c] of STARS) circ(a * W, b * 520, 1.5 + c * 2, `rgba(255,255,230,${.4 + .5 * Math.abs(Math.sin(S.t * (.5 + c) + a * 9))})`);
+  if (moon) { glowAt(moon[0], moon[1], 190, 'rgba(255,240,190,.35)'); circ(moon[0], moon[1], 62, '#fff4cf'); circ(moon[0] - 18, moon[1] - 10, 10, '#eadfb4'); circ(moon[0] + 20, moon[1] + 18, 7, '#eadfb4'); }
+}
+function hills(c1 = '#1d1838', c2 = '#15112b') {
+  poly([[0, 700], [180, 610], [380, 660], [560, 590], [800, 650], [1020, 580], [1240, 640], [1440, 600], [1440, FLOOR], [0, FLOOR]], c1);
+  for (let i = 0; i < 12; i++) { const x = i * 130 + 40, h = 90 + (i * 37) % 70; poly([[x - 40, 720], [x, 720 - h], [x + 40, 720]], c2); }
+}
+function ground(c = '#2b2436', top = '#3b3248') { R(0, FLOOR, W, H - FLOOR, c); R(0, FLOOR, W, 12, top); for (let i = 0; i < 30; i++) rr((i * 97) % W, FLOOR + 30 + (i * 53) % 80, 60, 18, 8, 'rgba(255,255,255,.05)'); }
+function indoor(wall = '#5a3b4e', stripe = '#634256', floor = '#4a3020', trim = '#2e1d14') {
+  R(0, 0, W, FLOOR, wall);
+  for (let x = 0; x < W; x += 80) R(x, 0, 36, FLOOR - 200, stripe);
+  R(0, FLOOR - 200, W, 200, trim); R(0, FLOOR - 206, W, 14, '#6f4a33');
+  for (let x = 0; x < W; x += 120) R(x + 10, FLOOR - 180, 100, 160, 'rgba(255,255,255,.04)');
+  R(0, FLOOR, W, H - FLOOR, floor);
+  for (let y = FLOOR + 20; y < H; y += 34) line(0, y, W, y, 'rgba(0,0,0,.25)', 3);
+}
+function stone(wall = '#4a4658', floor = '#36323f') {
+  R(0, 0, W, FLOOR, wall);
+  for (let y = 0; y < FLOOR; y += 60) for (let x = (y / 60) % 2 ? -50 : 0; x < W; x += 100) rr(x + 3, y + 3, 94, 54, 6, 'rgba(255,255,255,.05)', 'rgba(0,0,0,.25)', 3);
+  R(0, FLOOR, W, H - FLOOR, floor); R(0, FLOOR, W, 10, '#57526a');
+}
+
+/* ---------- props ---------- */
+const DOOR_W = 150, DOOR_H = 290;
+function door(x, kind, { open = 0, glowing = false, col } = {}) {
+  const y = FLOOR - DOOR_H, l = x - DOOR_W / 2;
+  rr(l - 14, y - 14, DOOR_W + 28, DOOR_H + 14, 8, '#2a1a10');
+  R(l, y, DOOR_W, DOOR_H, '#120a0a');
+  if (glowing && open) glowAt(x, FLOOR - 140, 220, 'rgba(255,150,60,.35)');
+  ctx.save();
+  if (open) { ctx.translate(l, 0); ctx.scale(1 - open * .8, 1); ctx.translate(-l, 0); }
+  const c = col || { frost: '#5c7a96', glow: '#9a4b2a', broom: '#6a5a3a', pad: '#5d4636', chain: '#4f4a5c', plain: '#7a5536' }[kind] || '#6b4a30';
+  rr(l, y, DOOR_W, DOOR_H, 6, c, INK, 5);
+  rr(l + 18, y + 22, DOOR_W - 36, 100, 6, null, 'rgba(0,0,0,.35)', 4); rr(l + 18, y + 150, DOOR_W - 36, 116, 6, null, 'rgba(0,0,0,.35)', 4);
+  circ(l + DOOR_W - 26, y + 150, 9, '#e0b24a', INK, 3);
+  if (kind === 'frost') { rr(l + 30, y + 30, 90, 80, 6, '#cfe9ff', INK, 4); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; line(x, y + 70, x + Math.cos(a) * 34, y + 70 + Math.sin(a) * 34, '#ffffff', 4); } }
+  if (kind === 'broom') { line(l + DOOR_W - 4, y + 60, l + DOOR_W - 40, FLOOR - 70, '#a0703a', 9); poly([[l + DOOR_W - 62, FLOOR - 74], [l + DOOR_W - 20, FLOOR - 66], [l + DOOR_W - 30, FLOOR - 2], [l + DOOR_W - 80, FLOOR - 6]], '#d9b25a', INK, 3); R(l + DOOR_W - 6, y + 4, 8, DOOR_H - 8, '#120a0a'); }
+  if (kind === 'pad') { rr(l + DOOR_W - 48, y + 140, 40, 36, 6, '#c9a227', INK, 4); ctx.beginPath(); ctx.arc(l + DOOR_W - 28, y + 140, 13, Math.PI, 0); ctx.lineWidth = 6; ctx.strokeStyle = '#9a9aa8'; ctx.stroke(); }
+  if (kind === 'chain') { for (let i = 0; i < 9; i++) { ell(l + 10 + i * 16, y + 120 + i * 10, 10, 6, null, '#b8b8c8', 4); ell(l + 10 + i * 16, y + 210 - i * 10, 10, 6, null, '#b8b8c8', 4); } }
+  ctx.restore();
+}
+function gate(x, kind) {
+  const y = FLOOR - 270;
+  line(x - 80, FLOOR, x - 80, y, '#5a4030', 14); line(x + 80, FLOOR, x + 80, y, '#5a4030', 14);
+  ctx.beginPath(); ctx.arc(x, y, 80, Math.PI, 0); ctx.lineWidth = 14; ctx.strokeStyle = '#5a4030'; ctx.stroke();
+  for (let i = -2; i <= 2; i++) line(x + i * 30, FLOOR - 10, x + i * 30, y + 20, '#3a2a20', 5);
+  rr(x - 60, y - 40, 120, 54, 8, '#d9c08a', INK, 4);
+  if (kind === 'bridge') { ctx.beginPath(); ctx.arc(x, y - 4, 32, Math.PI, 0); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke(); line(x - 45, y - 4, x + 45, y - 4, INK, 5); }
+  if (kind === 'woods') { poly([[x - 30, y + 2], [x - 14, y - 34], [x + 2, y + 2]], '#3f7a3a', INK, 3); poly([[x + 2, y + 2], [x + 18, y - 30], [x + 34, y + 2]], '#3f7a3a', INK, 3); }
+  if (kind === 'rail') { line(x - 40, y - 2, x + 40, y - 2, INK, 4); line(x - 40, y - 20, x + 40, y - 20, INK, 4); for (let i = -3; i <= 3; i++) line(x + i * 12, y - 26, x + i * 12, y + 4, '#7a4a2a', 4); }
+}
+function paper(x, y, rot = -.05, fresh = true, w = 90, h = 110) {
+  if (fresh) { const p = .5 + .5 * Math.sin(S.t * 3.5); glowAt(x, y, 110 + p * 30, `rgba(255,215,90,${.35 + p * .25})`); }
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+  rr(-w / 2, -h / 2, w, h, 4, '#f6ebcf', INK, 4);
+  for (let i = 0; i < 5; i++) line(-w / 2 + 12, -h / 2 + 22 + i * 17, w / 2 - 12 - (i % 2) * 18, -h / 2 + 22 + i * 17, '#8a7656', 3);
+  circ(0, -h / 2 + 6, 7, '#c8432f', INK, 2);
+  ctx.restore();
+}
+function lampPost(x, h = 430, lit = true) {
+  line(x, FLOOR, x, FLOOR - h, '#222033', 14); rr(x - 26, FLOOR - h - 60, 52, 64, 8, '#2b2840', INK, 4);
+  if (lit) { glowAt(x, FLOOR - h - 28, 160, 'rgba(255,210,120,.45)'); rr(x - 16, FLOOR - h - 50, 32, 44, 4, '#ffe3a0'); }
+  poly([[x - 34, FLOOR - h - 60], [x, FLOOR - h - 92], [x + 34, FLOOR - h - 60]], '#2b2840', INK, 4);
+}
+function bench(x) { rr(x - 90, FLOOR - 90, 180, 20, 6, '#7a5232', INK, 4); rr(x - 90, FLOOR - 150, 180, 18, 6, '#7a5232', INK, 4); line(x - 74, FLOOR - 70, x - 74, FLOOR, INK, 8); line(x + 74, FLOOR - 70, x + 74, FLOOR, INK, 8); line(x - 80, FLOOR - 132, x - 80, FLOOR - 90, INK, 6); line(x + 80, FLOOR - 132, x + 80, FLOOR - 90, INK, 6); }
+function crate(x, w = 140, h = 120, label = '') { rr(x - w / 2, FLOOR - h, w, h, 4, '#8a6238', INK, 5); line(x - w / 2, FLOOR - h, x + w / 2, FLOOR, '#5a3d22', 5); line(x + w / 2, FLOOR - h, x - w / 2, FLOOR, '#5a3d22', 5); if (label) { rr(x - w / 2 + 8, FLOOR - h + 8, w - 16, 30, 4, '#f3e2b8', INK, 3); txt(label, x, FLOOR - h + 24, 18, INK); } }
+function bush(x, s = 1) { for (const [dx, dy, r] of [[-50, -40, 50], [10, -70, 60], [60, -40, 50], [0, -30, 55]]) circ(x + dx * s, FLOOR + dy * s, r * s, '#24452e', INK, 4); }
+function windowFrame(x, y, w, h, { moon = true, rain = false } = {}) {
+  rr(x - 10, y - 10, w + 20, h + 20, 8, '#3a2618'); const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#13113a'); g.addColorStop(1, '#3a2d68'); rr(x, y, w, h, 4, g);
+  if (moon) { circ(x + w * .7, y + h * .3, Math.min(w, h) * .14, '#fff4cf'); }
+  if (rain) for (let i = 0; i < 14; i++) { const rx = x + ((i * 37 + S.t * 160) % w), ry = y + ((i * 61 + S.t * 520) % h); line(rx, ry, rx - 6, ry + 18, 'rgba(180,200,255,.6)', 3); }
+  line(x + w / 2, y, x + w / 2, y + h, '#3a2618', 8); line(x, y + h / 2, x + w, y + h / 2, '#3a2618', 8); rr(x, y, w, h, 4, null, INK, 5);
+}
+function wallLamp(x, y, c = 'rgba(255,200,110,.5)') { glowAt(x, y, 180, c); line(x, y - 30, x, y - 70, INK, 6); rr(x - 22, y - 30, 44, 50, 10, '#ffe0a0', INK, 4); }
+function frame(x, y, w, h, tilt, draw) { ctx.save(); ctx.translate(x, y); ctx.rotate(tilt); rr(-w / 2, -h / 2, w, h, 4, '#b8892e', INK, 5); rr(-w / 2 + 12, -h / 2 + 12, w - 24, h - 24, 2, '#3f5a5a'); draw && draw(w, h); ctx.restore(); }
+function arrow(x, y, label, on) {
+  const p = on ? .5 + .5 * Math.sin(S.t * 4) : 0;
+  ctx.globalAlpha = on ? 1 : .35;
+  if (on) glowAt(x, y, 90, `rgba(255,215,90,${.25 + .25 * p})`);
+  poly([[x - 40 + p * 8, y - 26], [x + 10 + p * 8, y - 26], [x + 10 + p * 8, y - 46], [x + 50 + p * 8, y], [x + 10 + p * 8, y + 46], [x + 10 + p * 8, y + 26], [x - 40 + p * 8, y + 26]], '#ffcf4a', INK, 5);
+  ctx.globalAlpha = 1;
+}
+function rails(y = 940) { R(0, y - 14, W, 8, '#7a7a8a'); R(0, y + 22, W, 8, '#7a7a8a'); for (let x = 0; x < W; x += 60) R(x, y - 20, 18, 56, '#4a3424'); }
+
+/* =====================================================================
+   Scene art. Each scene: start x, spot boxes {x,y,w,h} (centers),
+   door x positions, hide spots, Tock's perch, lights, and a draw().
+   ===================================================================== */
+const SPOT = (x, y, w, h) => ({ x, y, w, h });
+const ART = {
+  bakeryStreet: {
+    start: 150, spots: { clue: SPOT(940, 640, 110, 130), window: SPOT(740, 640, 260, 230), lamp: SPOT(320, 640, 110, 440), exit: SPOT(1100, 735, 150, 290) },
+    lights: [[320, 425, 300], [740, 640, 240]],
+    draw(st) {
+      sky(); hills(); ground('#2a2433', '#3e3450');
+      // bakery
+      rr(560, 380, 760, 500, 4, '#7a3f34', INK, 6);
+      for (let y = 400; y < 880; y += 34) for (let x = (y / 34) % 2 ? 560 : 590; x < 1310; x += 60) rr(x, y, 52, 26, 3, 'rgba(0,0,0,.12)');
+      poly([[530, 390], [940, 230], [1350, 390]], '#3b2440', INK, 6);
+      rr(690, 300, 500, 70, 10, '#2b1d3a', '#ffcf4a', 5); txt("BRAMBLE'S BAKERY", 940, 336, 40, '#ffcf4a', 'center', 'Creepster, fantasy', '400');
+      rr(610, 520, 260, 240, 6, '#ffd890', INK, 6); glowAt(740, 640, 160, 'rgba(255,200,110,.4)');
+      for (let i = 0; i < 3; i++) { ell(660 + i * 80, 720, 34, 14, '#c8742c', INK, 3); }
+      rr(700, 600, 80, 10, 3, '#eee', INK, 3); line(740, 610, 740, 650, INK, 5); ell(740, 652, 30, 8, '#ddd', INK, 3);
+      line(740, 520, 740, 760, '#5a3020', 6); line(610, 640, 870, 640, '#5a3020', 6);
+      door(1100, 'plain', { col: '#4a2c4a', open: st.opening });
+      paper(940, 640, -.06, !st.earned);
+      lampPost(320);
+    },
+  },
+  kitchen: {
+    start: 140, spots: { clue: SPOT(540, 470, 120, 150), plate: SPOT(250, 700, 120, 80), jar: SPOT(380, 680, 80, 110) },
+    doors: { frost: 700, broom: 940, glow: 1180 },
+    lights: [[1360, 760, 300], [540, 360, 260]],
+    draw(st) {
+      indoor('#6b4a3a', '#735040', '#4a3020', '#3a2418');
+      // counter
+      rr(90, 720, 360, 160, 6, '#8a5a36', INK, 5); rr(80, 706, 380, 22, 4, '#d9c6a0', INK, 4);
+      ell(250, 702, 54, 12, '#f2f2f2', INK, 3); circ(250, 698, 4, '#c0c8d8');
+      rr(352, 610, 60, 96, 14, '#e8dcc0', INK, 4); txt('FLOUR', 382, 668, 13, INK);
+      for (let i = 0; i < 3; i++) line(368 + i * 14, 616, 360 + i * 18, 560 - i * 6, '#b9c0cc', 6);
+      // shelf
+      rr(120, 420, 300, 16, 3, '#6a4528', INK, 4); for (let i = 0; i < 5; i++) rr(140 + i * 56, 370, 40, 50, 8, ['#c94', '#7ac', '#da5', '#a6c', '#6b8'][i], INK, 3);
+      wallLamp(540, 300);
+      paper(540, 470, .03, !st.earned, 110, 140);
+      // oven beside the glowing door
+      rr(1270, 560, 170, 320, 50, '#9a4a32', INK, 6);
+      for (let y = 580; y < 880; y += 30) for (let x = (y / 30) % 2 ? 1280 : 1300; x < 1430; x += 44) rr(x, y, 38, 22, 3, 'rgba(0,0,0,.12)');
+      rr(1300, 700, 110, 90, 30, '#2a1208', INK, 5); glowAt(1355, 750, 120, 'rgba(255,140,40,.6)'); rr(1310, 740, 90, 40, 14, '#ff8a2a');
+      for (const [id, x] of Object.entries(this.doors)) door(x, id, { open: st.opened === id ? st.opening : 0 });
+    },
+  },
+  backStairs: {
+    start: 140, spots: { clue: SPOT(640, 800, 100, 90), cat: SPOT(380, 830, 140, 80), step: SPOT(940, 640, 120, 80), exit: SPOT(1340, 760, 130, 200) },
+    lights: [[1200, 300, 260], [640, 800, 160]],
+    draw(st) {
+      indoor('#4a3550', '#523c58', '#3e2818', '#2b1a14');
+      // staircase rising to the right
+      for (let i = 0; i < 9; i++) { const x = 560 + i * 90, y = FLOOR - (i + 1) * 60; rr(x, y, 900 - i * 90, 60, 2, i % 2 ? '#6e4a2e' : '#7a5232', INK, 4); }
+      line(560, FLOOR - 60, 1440, FLOOR - 600, '#3a2418', 10);
+      for (let i = 0; i < 9; i++) line(600 + i * 90, FLOOR - 60 - i * 60, 600 + i * 90, FLOOR - 180 - i * 60, '#3a2418', 6);
+      wallLamp(1200, 230);
+      // bread basket + sleepy cat
+      ell(380, 850, 80, 26, '#b9853a', INK, 4); ell(380, 830, 62, 22, '#2b2230'); circ(340, 820, 22, '#2b2230'); poly([[326, 804], [330, 784], [342, 800]], '#2b2230'); poly([[346, 800], [356, 782], [360, 804]], '#2b2230');
+      txt('z', 300 + Math.sin(S.t * 2) * 6, 770 - (S.t * 20 % 40), 26, '#cfc4ff');
+      paper(640, 800, .2, !st.earned, 80, 64);
+      if (st.arrow !== false) arrow(1340, 740, '', st.earned);
+    },
+  },
+  hall: {
+    start: 140, spots: { clue: SPOT(730, 520, 140, 170), portrait: SPOT(400, 470, 170, 200), mirror: SPOT(1060, 560, 140, 240), exit: SPOT(1340, 735, 130, 290) },
+    lights: [[580, 330, 230], [900, 330, 230]],
+    draw(st) {
+      indoor('#3e4a5e', '#455268', '#4a2e22', '#2b2030');
+      rr(150, FLOOR + 20, 1100, 70, 20, '#7a2a3a', INK, 4);
+      frame(400, 470, 170, 200, st.tilt || .12, (w, h) => { circ(0, -10, 40, '#e8c8a0', INK, 3); rr(-50, 30, 100, 50, 20, '#5a3a6a'); circ(-14, -14, 5, INK); circ(14, -14, 5, INK); });
+      frame(1060, 560, 140, 240, 0, (w, h) => { rr(-w / 2 + 12, -h / 2 + 12, w - 24, h - 24, 2, '#9fb6c9'); line(-30, -60, 20, -20, '#fff', 4); });
+      wallLamp(580, 270); wallLamp(900, 270);
+      paper(730, 520, -.04, !st.earned, 130, 160);
+      door(1340, 'plain', { col: '#5a4a6a', open: st.opening });
+      txt('ATTIC', 1340, 560, 22, '#ffcf4a');
+    },
+  },
+  attic: {
+    start: 140, spots: { clue: SPOT(1000, 770, 110, 80), streamers: SPOT(620, 300, 300, 110), horse: SPOT(330, 790, 170, 150), exit: SPOT(1340, 760, 130, 200) },
+    lights: [[760, 300, 260], [1000, 770, 200]],
+    draw(st) {
+      R(0, 0, W, FLOOR, '#3a2c3e');
+      for (let x = -200; x < W; x += 240) { line(x, FLOOR, x + 520, 0, '#2a1e2c', 22); }
+      poly([[0, 0], [W, 0], [W, 120], [0, 120]], '#2a1e2c');
+      circ(760, 300, 90, '#2a2550', INK, 10); circ(790, 280, 22, '#fff4cf'); line(670, 300, 850, 300, INK, 8); line(760, 210, 760, 390, INK, 8);
+      // streamers
+      for (let i = 0; i < 7; i++) { const x = 470 + i * 50; ctx.beginPath(); ctx.moveTo(x, 250); ctx.quadraticCurveTo(x + 25, 330 + Math.sin(S.t * 2 + i) * 10, x + 50, 250); ctx.lineWidth = 7; ctx.strokeStyle = ['#ff7a4a', '#ffcf4a', '#62d26f', '#4fb0ff', '#c77dff'][i % 5]; ctx.stroke(); }
+      R(0, FLOOR, W, H - FLOOR, '#3a2a20'); for (let y = FLOOR + 20; y < H; y += 34) line(0, y, W, y, 'rgba(0,0,0,.25)', 3);
+      // rocking horse
+      ctx.save(); ctx.translate(330, 850); ctx.rotate(Math.sin(S.t * 1.6) * .08);
+      ctx.beginPath(); ctx.arc(0, -40, 110, .25 * Math.PI, .75 * Math.PI); ctx.lineWidth = 10; ctx.strokeStyle = '#7a4a2a'; ctx.stroke();
+      rr(-60, -120, 120, 50, 20, '#d8c0a0', INK, 4); rr(40, -170, 40, 70, 12, '#d8c0a0', INK, 4); ell(80, -170, 34, 20, '#d8c0a0', INK, 4); line(-50, -70, -60, 20, INK, 6); line(50, -70, 60, 20, INK, 6);
+      ctx.restore();
+      // trunk + table with the cake
+      rr(920, 790, 200, 90, 10, '#6a3a2a', INK, 5); rr(920, 780, 200, 30, 10, '#7a4a32', INK, 5);
+      paper(1000, 770, -.1, !st.earned, 90, 60);
+      rr(1150, 760, 140, 14, 4, '#7a5232', INK, 4); line(1170, 774, 1170, FLOOR, INK, 7); line(1270, 774, 1270, FLOOR, INK, 7);
+      rr(1170, 660, 100, 100, 10, '#4fb0ff', INK, 4); for (let i = 0; i < 12; i++) circ(1180 + (i * 37) % 80, 670 + (i * 23) % 80, 3, '#e8eef8');
+      if (st.arrow !== false) arrow(1340, 740, '', st.earned);
+    },
+  },
+  platform: {
+    start: 140, spots: { clue: SPOT(640, 560, 170, 180), clock: SPOT(260, 420, 140, 140), hat: SPOT(1060, 930, 120, 70), exit: SPOT(1350, 735, 140, 290) },
+    hides: [[430, 'crate'], [880, 'bench'], [1180, 'bench']], lights: [[560, 430, 280], [1010, 430, 280]],
+    draw(st) {
+      sky('#0b0a20', '#2b2a50', [1240, 140]); hills('#1b1a34', '#141228');
+      rr(0, 360, 520, 520, 4, '#5a4a3a', INK, 6); poly([[-20, 370], [260, 250], [540, 370]], '#3a2e40', INK, 6);
+      circ(260, 420, 60, '#f6ebcf', INK, 6); line(260, 420, 228, 402, INK, 6); line(260, 420, 300, 420, INK, 5);
+      rr(60, 560, 120, 200, 6, '#ffd890', INK, 5); rr(340, 560, 120, 200, 6, '#ffd890', INK, 5);
+      R(0, FLOOR - 4, W, 16, '#6a6a7a');
+      rr(560, 470, 170, 200, 6, '#2b2030', INK, 6); line(590, 670, 590, FLOOR, INK, 8); line(700, 670, 700, FLOOR, INK, 8);
+      paper(640, 560, 0, !st.earned, 140, 160);
+      lampPost(560, 380); lampPost(1010, 380);
+      crate(430, 120, 100); bench(880); bench(1180);
+      R(0, FLOOR + 10, W, H - FLOOR, '#1e1a28'); rails(945);
+      ell(1060, 930, 40, 14, '#2b3a6a', INK, 3); rr(1036, 908, 48, 24, 8, '#2b3a6a', INK, 3);
+      door(1350, 'plain', { col: '#4a5a6a', open: st.opening }); txt('TICKETS', 1350, 560, 22, '#ffcf4a');
+    },
+  },
+  ticketOffice: {
+    start: 140, spots: { clue: SPOT(760, 690, 170, 80), window: SPOT(380, 540, 200, 180), stove: SPOT(1150, 760, 150, 220), exit: SPOT(1350, 735, 140, 290) },
+    hides: [[570, 'bench'], [980, 'bench']], lights: [[1150, 700, 260], [760, 360, 260]],
+    draw(st) {
+      indoor('#3e5250', '#435a58', '#3a2a20', '#28302e');
+      windowFrame(240, 300, 280, 200, { rain: true });
+      rr(260, 500, 240, 60, 6, '#6a4a30', INK, 5); txt('CLOSED', 380, 530, 30, '#c8432f', 'center', 'Creepster, fantasy', '400');
+      rr(640, 720, 260, 160, 6, '#7a5232', INK, 5); rr(630, 706, 280, 20, 4, '#a07a52', INK, 4);
+      paper(720, 690, -.1, !st.earned, 70, 50); paper(800, 692, .08, false, 70, 50);
+      wallLamp(760, 300);
+      bench(570); bench(980);
+      rr(1090, 640, 120, 240, 16, '#2b2b33', INK, 5); glowAt(1150, 780, 120, 'rgba(255,120,40,.5)'); rr(1110, 760, 80, 50, 10, '#ff8a2a'); line(1150, 640, 1150, 300, '#2b2b33', 22);
+      door(1350, 'plain', { col: '#4a3a2a', open: st.opening });
+    },
+  },
+  signalBox: {
+    start: 140, spots: { clue: SPOT(470, 690, 110, 80), cocoa: SPOT(600, 680, 70, 70), levers: SPOT(880, 690, 300, 240), exit: SPOT(1350, 735, 140, 290) },
+    hides: [[250, 'chair'], [1140, 'cabinet']], lights: [[700, 330, 300], [470, 690, 160]],
+    draw(st) {
+      indoor('#5a4a36', '#62513c', '#3a2a1c', '#2e2418');
+      windowFrame(300, 220, 840, 260, { rain: true, moon: false });
+      rr(380, 720, 280, 160, 6, '#6a4a30', INK, 5); rr(370, 706, 300, 20, 4, '#8a6a46', INK, 4);
+      paper(470, 690, -.05, !st.earned, 100, 60);
+      rr(578, 660, 44, 46, 8, '#c8e0ff', INK, 4); ctx.beginPath(); ctx.arc(624, 683, 14, -1.2, 1.2); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+      // chair (hide)
+      rr(190, 700, 130, 30, 8, '#8a3a3a', INK, 4); rr(196, 560, 30, 160, 8, '#8a3a3a', INK, 4); line(205, 730, 205, FLOOR, INK, 8); line(305, 730, 305, FLOOR, INK, 8);
+      // levers
+      R(740, 800, 300, 80, '#3a3a44');
+      for (let i = 0; i < 5; i++) { const x = 770 + i * 60, lean = i === 2 ? .45 : -.25; line(x, 800, x + Math.sin(lean) * 160, 800 - Math.cos(lean) * 160, i === 2 ? '#d9534f' : '#9a9aa8', 12); circ(x + Math.sin(lean) * 160, 800 - Math.cos(lean) * 160, 14, '#2b2b33'); txt(String(i + 1), x, 840, 22, '#ffcf4a'); }
+      rr(1080, 640, 120, 240, 6, '#5a3d28', INK, 5);
+      door(1350, 'plain', { col: '#3a4a3a', open: st.opening });
+    },
+  },
+  bridgePath: {
+    start: 140, spots: { clue: SPOT(330, 600, 150, 170), goat: SPOT(160, 820, 120, 110), river: SPOT(1110, 450, 300, 100) },
+    doors: { woods: 760, rail: 1010, bridge: 1260 }, gates: true,
+    hides: [[560, 'bush']], lights: [[330, 470, 250]],
+    draw(st) {
+      sky('#0b0a22', '#252448', [300, 130]); hills('#1a1a30', '#121226');
+      // river and the broken bridge far off
+      R(860, 520, 580, 70, '#2b4a6a'); for (let i = 0; i < 8; i++) line(880 + ((i * 90 + S.t * 60) % 560), 540 + (i % 3) * 14, 920 + ((i * 90 + S.t * 60) % 560), 540 + (i % 3) * 14, '#6fa3c8', 3);
+      R(900, 480, 170, 14, '#3a2a20'); R(1220, 480, 220, 14, '#3a2a20'); for (const x of [920, 1040, 1250, 1380]) R(x, 494, 12, 50, '#3a2a20');
+      ground('#25222e', '#34303e');
+      bush(560, 1.1);
+      line(330, FLOOR, 330, 520, '#5a4030', 14); rr(240, 500, 180, 190, 6, '#d9c08a', INK, 5);
+      paper(330, 600, .02, !st.earned, 140, 150);
+      lampPost(420, 380, true);
+      // goat
+      ell(160, 820, 46, 30, '#e8e0d0', INK, 4); circ(205, 790, 18, '#e8e0d0', INK, 4); line(140, 845, 140, FLOOR, INK, 6); line(180, 845, 180, FLOOR, INK, 6); line(200, 772, 190, 755, INK, 4); circ(210, 788, 3, INK);
+      for (const [id, x] of Object.entries(this.doors)) gate(x, id);
+    },
+  },
+  switchShack: {
+    start: 140, spots: { clue: SPOT(800, 560, 200, 150), lamp: SPOT(380, 600, 100, 420), rails: SPOT(1120, 920, 280, 60), exit: SPOT(1340, 760, 130, 200) },
+    hides: [[570, 'crate'], [1010, 'bush']], lights: [[380, 470, 280], [800, 560, 220]],
+    draw(st) {
+      sky('#0a0c1e', '#1e2a3a', [1150, 120]); hills('#162420', '#0f1a16');
+      for (let i = 0; i < 9; i++) { const x = 40 + i * 170; poly([[x - 60, 760], [x, 440 + (i % 3) * 40], [x + 60, 760]], '#173226', INK, 3); }
+      ground('#1e2a24', '#2a3a30');
+      rr(640, 440, 330, 440, 4, '#5a4a3a', INK, 6); poly([[620, 450], [805, 350], [990, 450]], '#3a2e30', INK, 6);
+      rr(700, 490, 200, 140, 4, '#efe2bf', INK, 4); line(712, 540, 888, 540, '#3b2a1a', 5); line(780, 540, 740, 610, '#3b2a1a', 4);
+      if (!st.earned) { const p = .5 + .5 * Math.sin(S.t * 3.5); glowAt(800, 560, 140 + 30 * p, `rgba(255,215,90,${.3 + .2 * p})`); }
+      lampPost(380, 380, true);
+      ctx.fillStyle = '#7a7a8a'; R(0, 905, W, 8, '#7a7a8a'); R(0, 945, 1000, 8, '#7a7a8a');
+      ctx.beginPath(); ctx.moveTo(980, 949); ctx.quadraticCurveTo(1200, 960, 1440, 990); ctx.lineWidth = 8; ctx.strokeStyle = '#7a7a8a'; ctx.stroke();
+      crate(570, 110, 90); bush(1010, .9);
+      if (st.arrow !== false) arrow(1340, 740, '', st.earned);
+    },
+  },
+  square: {
+    start: 120, spots: { clue: SPOT(900, 560, 170, 200), fountain: SPOT(1180, 790, 200, 170), crate: SPOT(330, 820, 150, 120), exit: SPOT(1360, 760, 130, 200) },
+    perch: [560, 380], lights: [[560, 180, 260], [560, 380, 200], [900, 500, 230]],
+    draw(st) {
+      sky('#0c0a24', '#2e2a56', [1260, 130]); hills();
+      // clock tower
+      rr(440, 40, 240, 840, 4, '#5a5266', INK, 6); poly([[420, 50], [560, -80], [700, 50]], '#3a2e48', INK, 6);
+      circ(560, 180, 90, '#f6ebcf', INK, 7); for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; circ(560 + Math.cos(a) * 72, 180 + Math.sin(a) * 72, 5, INK); }
+      clockHands(560, 180, 70);
+      rr(450, 440, 220, 18, 4, '#3a3448', INK, 4);
+      ground('#2b2733', '#3c3646');
+      rr(800, 440, 200, 240, 6, '#5a3d28', INK, 5); line(830, 680, 830, FLOOR, INK, 8); line(970, 680, 970, FLOOR, INK, 8);
+      paper(900, 560, .02, !st.earned, 160, 190);
+      ell(1180, 850, 110, 30, '#6a6a7a', INK, 5); rr(1080, 790, 200, 60, 20, '#6a6a7a', INK, 5); line(1180, 790, 1180, 700, '#6a6a7a', 16); ell(1180, 700, 40, 14, '#6fa3c8', INK, 3);
+      crate(330, 150, 110, 'NEW BELL');
+      if (st.arrow !== false) arrow(1360, 740, '', st.earned);
+    },
+  },
+  towerBase: {
+    start: 120, spots: { clue: SPOT(290, 560, 160, 130), cart: SPOT(470, 820, 130, 110), bench: SPOT(1350, 820, 160, 120) },
+    doors: { pad: 660, chain: 900, plain: 1140 }, perch: [900, 230], lights: [[290, 420, 240], [900, 250, 260]],
+    draw(st) {
+      stone('#4f4a5e', '#36323f');
+      rr(210, 495, 160, 130, 6, '#c9a227', INK, 5); rr(222, 507, 136, 106, 4, '#e8cf6a');
+      if (!st.earned) { const p = .5 + .5 * Math.sin(S.t * 3.5); glowAt(290, 560, 120 + 30 * p, `rgba(255,215,90,${.3 + .2 * p})`); }
+      for (let i = 0; i < 5; i++) line(240, 525 + i * 18, 340 - (i % 2) * 20, 525 + i * 18, '#6a5a20', 3);
+      wallLamp(290, 400);
+      rr(700, 216, 400, 20, 4, '#5a3d28', INK, 4);
+      rr(410, 800, 120, 60, 8, '#7a5232', INK, 4); circ(430, 868, 14, '#3a3a44'); for (let i = 0; i < 3; i++) rr(424 + i * 30, 770, 22, 34, 4, '#8a8a9a', INK, 3);
+      bench(1350);
+      for (const [id, x] of Object.entries(this.doors)) door(x, id, { open: st.opened === id ? st.opening : 0 });
+    },
+  },
+  towerStairs: {
+    start: 120, spots: { clue: SPOT(560, 820, 100, 70), step: SPOT(800, 700, 120, 80), lamp: SPOT(1000, 430, 120, 120), exit: SPOT(1340, 760, 130, 200) },
+    perch: [1060, 380], lights: [[1000, 430, 300], [560, 820, 150]],
+    draw(st) {
+      stone('#45405a', '#302c3a');
+      // Tock's big shadow, drawn first so it sits on the wall
+      const sh = st.shadow == null ? 1 : st.shadow;
+      if (sh > 0) { ctx.globalAlpha = .55 * sh; owlShape(600, 360, 3.2 * sh + .4 * (1 - sh), '#120e1c'); ctx.globalAlpha = 1; }
+      for (let i = 0; i < 8; i++) { const x = 480 + i * 110, y = FLOOR - (i + 1) * 55; rr(x, y, 960 - i * 110, 55, 2, i % 2 ? '#5d586e' : '#67627a', INK, 4); }
+      rr(940, 470, 120, 20, 4, '#5a3d28', INK, 4); line(1000, 490, 1000, 560, INK, 6);
+      glowAt(1000, 430, 200, 'rgba(255,220,140,.6)'); rr(970, 400, 60, 70, 12, '#ffe7a8', INK, 5);
+      paper(560, 820, .15, !st.earned, 80, 60);
+      if (st.arrow !== false) arrow(1340, 740, '', st.earned);
+    },
+  },
+  gearRoom: {
+    start: 120, spots: { clue: SPOT(720, 440, 100, 80), crank: SPOT(320, 700, 160, 160), pendulum: SPOT(1120, 600, 140, 360), exit: SPOT(1340, 760, 130, 200) },
+    perch: [900, 210], lights: [[720, 440, 220], [300, 300, 260]],
+    draw(st) {
+      stone('#4a4250', '#332e38');
+      const stopped = 1;
+      gear(620, 420, 140, 14, stopped ? 0 : S.t * .3, '#b8892e'); gear(830, 470, 100, 10, 0, '#9a7a3a'); gear(760, 250, 80, 9, 0, '#c9a227');
+      paper(720, 440, .4, !st.earned, 60, 46);
+      // crank
+      circ(320, 700, 60, '#8a7a5a', INK, 6); line(320, 700, 380, 640, '#b8892e', 14); circ(380, 640, 16, '#c9a227', INK, 4);
+      // pendulum stuck mid-swing
+      line(1120, 420, 1160, 760, '#b8892e', 10); circ(1160, 780, 50, '#c9a227', INK, 6);
+      rr(860, 210, 120, 14, 4, '#5a3d28', INK, 4);
+      wallLamp(300, 260);
+      if (st.arrow !== false) arrow(1340, 740, '', st.earned);
+    },
+  },
+  belfry: {
+    start: 120, spots: { clue: SPOT(1100, 560, 150, 180), bell: SPOT(800, 380, 220, 240), window: SPOT(330, 430, 240, 260), exit: SPOT(1340, 760, 130, 200) },
+    perch: [560, 230], lights: [[800, 300, 260], [1100, 560, 220]],
+    draw(st) {
+      R(0, 0, W, FLOOR, '#3a3448');
+      for (const x of [200, 1000]) { rr(x, 260, 260, 360, 120, '#0d0b25'); for (const [a, b] of STARS.slice(0, 12)) circ(x + 20 + a * 220, 290 + b * 200, 2, '#fff8'); for (let i = 0; i < 6; i++) rr(x + 20 + i * 40, 520 - (i % 3) * 30, 30, 100, 2, '#1a1638'); for (let i = 0; i < 6; i++) rr(x + 28 + i * 40, 540 - (i % 3) * 30, 8, 10, 1, '#ffcf4a'); }
+      ground('#2e2a36', '#423c4e');
+      line(800, 0, 800, 230, INK, 10);
+      poly([[700, 470], [720, 300], [800, 240], [880, 300], [900, 470]], '#d8dce6', INK, 6); ell(800, 470, 100, 18, '#c0c4ce', INK, 5);
+      rr(500, 220, 140, 14, 4, '#5a3d28', INK, 4);
+      rr(1030, 470, 140, 180, 6, '#b8892e', INK, 6); rr(1044, 484, 112, 152, 2, '#f1e3bf');
+      for (let i = 0; i < 6; i++) line(1056, 530 + i * 16, 1144 - (i % 2) * 20, 530 + i * 16, '#8a7656', 3); R(1056, 496, 88, 22, '#3a2a1a');
+      if (!st.earned) { const p = .5 + .5 * Math.sin(S.t * 3.5); glowAt(1100, 560, 120 + 30 * p, `rgba(255,215,90,${.3 + .2 * p})`); }
+      if (st.arrow !== false) arrow(1340, 740, '', st.earned);
+    },
+  },
+};
+function clockHands(x, y, r) { const m = 59 / 60 * Math.PI * 2 - Math.PI / 2, h = (11 + 59 / 60) / 12 * Math.PI * 2 - Math.PI / 2; line(x, y, x + Math.cos(h) * r * .5, y + Math.sin(h) * r * .5, INK, 8); line(x, y, x + Math.cos(m) * r * .8, y + Math.sin(m) * r * .8, INK, 5); circ(x, y, 7, INK); }
+function gear(x, y, r, n, a, c) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.beginPath();
+  for (let i = 0; i < n * 2; i++) { const ang = i * Math.PI / n, rr2 = i % 2 ? r : r * 1.18 + 3; ctx.lineTo(Math.cos(ang) * rr2, Math.sin(ang) * rr2); }
+  ctx.closePath(); ctx.fillStyle = c; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke(); circ(0, 0, r * .35, '#4a4250', INK, 4); ctx.restore();
+}
+
+/* =====================================================================
+   Characters (all original, cartoon-scary)
+   ===================================================================== */
+function drawKid(x, y, { face = 1, phase = 0, coat = '#ffd23f', crouch = 0, lantern = true } = {}) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(face, 1);
+  const k = 1 - crouch * .28, step = Math.sin(phase) * 14 * (1 - crouch);
+  rr(-30 + step, -26, 30, 26, 8, '#3a2a5a', INK, 4); rr(4 - step, -26, 30, 26, 8, '#3a2a5a', INK, 4);
+  ctx.translate(0, -24); ctx.scale(1, k);
+  poly([[-48, 0], [-32, -150], [32, -150], [48, 0]], coat, INK, 5);
+  line(0, -140, 0, -10, 'rgba(0,0,0,.25)', 4); for (let i = 0; i < 3; i++) circ(10, -120 + i * 36, 5, INK);
+  circ(0, -182, 46, coat, INK, 5);
+  circ(6, -176, 34, '#f2c9a0', INK, 4); circ(-4, -180, 5, INK); circ(18, -180, 5, INK); ctx.beginPath(); ctx.arc(8, -166, 9, .2, Math.PI - .2); ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+  poly([[-46, -192], [0, -232], [46, -192], [30, -206], [-30, -206]], coat, INK, 5);
+  // arm + lantern
+  line(26, -120, 62, -78, coat, 16); line(26, -120, 62, -78, INK, 3);
+  line(62, -78, 62, -60, INK, 4);
+  if (lantern) glowAt(62, -36, 70, 'rgba(255,210,100,.7)');
+  rr(46, -60, 32, 44, 6, lantern ? '#ffe28a' : '#6a6a6a', INK, 4); R(44, -64, 36, 6, INK); R(44, -18, 36, 6, INK);
+  ctx.restore();
+}
+function drawWick(x, y, flick = 0, scale = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+  const f = 1 + Math.sin(S.t * 18) * .08 + flick * Math.sin(S.t * 41) * .45;
+  glowAt(0, -46, 60 + flick * 20, 'rgba(255,200,90,.6)');
+  ctx.save(); ctx.translate(0, -34); ctx.scale(1 + flick * .2 * Math.sin(S.t * 30), f);
+  poly([[0, -40], [14, -10], [0, 2], [-14, -10]], flick > .3 ? '#ff9a3a' : '#ffcf4a', INK, 3); ctx.restore();
+  rr(-18, -28, 36, 56, 8, '#f8f0dc', INK, 4); ell(-12, -24, 6, 10, '#f8f0dc');
+  circ(-7, -6, 3.5, INK); circ(7, -6, 3.5, INK);
+  if (flick > .3) ell(0, 8, 5, 6, INK); else { ctx.beginPath(); ctx.arc(0, 4, 6, .2, Math.PI - .2); ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke(); }
+  ctx.restore();
+}
+function drawMumbles(x, y, { a = 1, scale = 1, hat = false, peek = false } = {}) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale); ctx.globalAlpha = a;
+  ctx.beginPath(); ctx.moveTo(-70, 60); ctx.bezierCurveTo(-80, -120, 80, -120, 70, 60);
+  for (let i = 0; i < 5; i++) { const xx = 70 - i * 28; ctx.quadraticCurveTo(xx - 7, 80 + Math.sin(S.t * 6 + i) * 10, xx - 14, 60); ctx.quadraticCurveTo(xx - 21, 44, xx - 28, 60); }
+  ctx.closePath(); ctx.fillStyle = '#f4f2ff'; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+  ell(-24, -30, 12, 18, INK); ell(24, -30, 12, 18, INK); ell(0, 6, peek ? 22 : 9, peek ? 24 : 11, INK);
+  if (hat) { poly([[-20, -90], [10, -170], [34, -86]], '#ff7a4a', INK, 4); circ(10, -172, 10, '#ffcf4a', INK, 3); }
+  ctx.restore();
+}
+function drawLamplighter(x, { t = 0, beam = 0, scale = 1, stilt = 1 } = {}) {
+  ctx.save(); ctx.translate(x, FLOOR); ctx.scale(scale, scale);
+  const sw = Math.sin(t * 5) * 30, legH = 380 * stilt;
+  line(-24, 0, -24 + sw * .4, -legH, '#6a5a4a', 12); line(24, 0, 24 - sw * .4, -legH, '#6a5a4a', 12);
+  const top = -legH;
+  poly([[-70, top + 20], [-44, top - 260], [44, top - 260], [70, top + 20]], '#231a30', INK, 6);
+  circ(0, top - 300, 46, '#d9d2c6', INK, 5);
+  circ(-16, top - 304, 9, '#ffe06a'); circ(16, top - 304, 9, '#ffe06a'); glowAt(0, top - 304, 40, 'rgba(255,224,106,.4)');
+  rr(-44, top - 360, 88, 24, 4, '#120d1a'); rr(-30, top - 430, 60, 74, 4, '#120d1a', INK, 4);
+  line(44, top - 220, 120, top - 120, '#231a30', 16); line(120, top - 120, 120, top - 40, INK, 5);
+  rr(102, top - 40, 36, 48, 6, '#ffe28a', INK, 4); glowAt(120, top - 16, 90, 'rgba(255,220,120,.7)');
+  if (beam > 0) { ctx.globalAlpha = .35 * beam; poly([[120, top - 16], [-160, 0], [400, 0]], '#ffe7a0'); ctx.globalAlpha = 1; }
+  ctx.restore();
+}
+function owlShape(x, y, s, c) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath(); ctx.ellipse(0, 10, 38, 46, 0, 0, Math.PI * 2); ctx.moveTo(-34, -20); ctx.lineTo(-40, -58); ctx.lineTo(-14, -34); ctx.moveTo(34, -20); ctx.lineTo(40, -58); ctx.lineTo(14, -34);
+  ctx.fillStyle = c; ctx.fill(); ctx.restore();
+}
+function drawTock(x, y, { open = 1, turn = 0, scale = 1 } = {}) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+  poly([[-30, -24], [-38, -62], [-12, -38]], '#a87a2a', INK, 4); poly([[30, -24], [38, -62], [12, -38]], '#a87a2a', INK, 4);
+  ell(0, 10, 40, 48, '#c9952e', INK, 5); ell(0, 26, 24, 26, '#e6c06a', INK, 3);
+  gear(0, 30, 12, 7, S.t * .5, '#8a6a20');
+  const sx = Math.cos(turn * Math.PI);
+  ctx.save(); ctx.scale(Math.max(.25, Math.abs(sx)), 1);
+  for (const ex of [-17, 17]) {
+    circ(ex, -14, 15, '#f4ecd2', INK, 4);
+    if (open > .05) { glowAt(ex, -14, 26 * open, 'rgba(255,220,60,.6)'); circ(ex, -14, 8 * open, '#ffd23f'); circ(ex, -14, 4 * open, INK); }
+    if (open < .95) { ctx.save(); ctx.beginPath(); ctx.arc(ex, -14, 15, 0, Math.PI * 2); ctx.clip(); R(ex - 16, -30, 32, 30 * (1 - open), '#b8892e'); ctx.restore(); line(ex - 12, -14 + 15 * (1 - open) - 15 * open * 0, ex + 12, -14 + 15 * (1 - open) - 15 * open * 0, INK, 3); }
+  }
+  poly([[-6, -2], [6, -2], [0, 10]], '#e07a2a', INK, 3);
+  ctx.restore();
+  ctx.restore();
+}
+
+/* =====================================================================
+   Game state
+   ===================================================================== */
+const S = { mode: 'title', t: 0 };
+let RUN = null;                    // save.run while a case is open
+const W0 = () => ({ c: null, s: null, sc: null, art: null, px: 150, tx: 150, face: 1, phase: 0, walking: false, pending: null, hiding: false, hidden: false, earned: false, doorAsk: false, doorTries: 0, doorReveal: false, opened: null, opening: 0, lanternOut: 0, busy: false, fade: 0, cr: {}, flick: 0, peek: 0, shake: 0, tilt: .12, met: false });
+let WORLD = W0();
+const caseData = () => CASES[RUN.c];
+const sceneData = () => caseData().scenes[RUN.s];
+let CUR = null;                    // the open question, for ?debug
+
+/* ---------- Wick's bubble ---------- */
+let wickTimer = 0;
+function wickSay(t, { up = false, ms = 5200 } = {}) {
+  $('wickTxt').textContent = t; $('wick').classList.add('on'); $('wick').classList.toggle('up', up);
+  clearTimeout(wickTimer); if (ms) wickTimer = setTimeout(() => $('wick').classList.remove('on'), ms + t.length * 30);
+}
+function wickHide() { clearTimeout(wickTimer); $('wick').classList.remove('on'); }
+$('wickSay').onclick = () => speak($('wickTxt').textContent);
+$('wick').onclick = e => { if (e.target === $('wick') || e.target.id === 'wickTxt') wickHide(); };
+const wf = $('wickFace').getContext('2d');
+function drawWickFace() {
+  if (!$('wick').classList.contains('on')) return;
+  const keep = ctx; ctx = wf;
+  wf.setTransform(1, 0, 0, 1, 0, 0); wf.clearRect(0, 0, 52, 64); wf.setTransform(.6, 0, 0, .6, 26, 62);
+  drawWick(0, 0, WORLD.flick || 0); ctx = keep;
+}
+
+/* ---------- record answers ---------- */
+function bump(skill, first) { const st = save.skills[skill] || (save.skills[skill] = { n: 0, ok: 0 }); st.n++; if (first) st.ok++; }
+function record(q, first, kind = 'q') {
+  const id = kind === 'ev' ? q.id + ':ev' : q.id;
+  bump(kind === 'ev' ? 'evidence' : q.skill, first);
+  const b = save.box[id] || 0;
+  save.box[id] = first ? Math.min(4, b + 1) : 0;
+  if (!first) save.miss[id] = (save.miss[id] || 0) + 1;
+  const day = new Date().toISOString().slice(0, 10); const d = save.days[day] || (save.days[day] = { n: 0, ok: 0 }); d.n++; if (first) d.ok++;
+  if (RUN) {
+    if (kind === 'ev') { RUN.evN++; if (first) RUN.evOk++; }
+    else { RUN.qN++; if (first) RUN.qOk++; if (!first && !q.extra && !RUN.due.includes(q.skill)) RUN.due.push(q.skill); }
+  }
+  persist();
+}
+
+/* =====================================================================
+   Passages: DOM text, every word tappable, every sentence a unit
+   ===================================================================== */
+const PICS = {
+  c1s4: `<svg class="pic" viewBox="0 0 320 170" role="img" aria-label="A baker holding up a big blue cake"><rect width="320" height="170" fill="#e9dcc0"/><rect x="80" y="70" width="170" height="70" rx="10" fill="#4fb0ff" stroke="#2b1d10" stroke-width="4"/><rect x="100" y="40" width="130" height="34" rx="8" fill="#6fc0ff" stroke="#2b1d10" stroke-width="4"/><circle cx="50" cy="70" r="22" fill="#f2c9a0" stroke="#2b1d10" stroke-width="4"/><rect x="28" y="92" width="44" height="60" rx="10" fill="#fff" stroke="#2b1d10" stroke-width="4"/><g fill="#fff"><circle cx="120" cy="90" r="3"/><circle cx="160" cy="110" r="3"/><circle cx="200" cy="95" r="3"/><circle cx="140" cy="55" r="3"/><circle cx="190" cy="60" r="3"/></g></svg>`,
+  c3s5: `<svg class="pic" viewBox="0 0 320 170" role="img" aria-label="A clockmaker holding a tiny brass owl"><rect width="320" height="170" fill="#e2d6bc"/><circle cx="140" cy="60" r="30" fill="#f2c9a0" stroke="#2b1d10" stroke-width="4"/><rect x="100" y="92" width="80" height="78" rx="14" fill="#6a4a7a" stroke="#2b1d10" stroke-width="4"/><ellipse cx="215" cy="98" rx="12" ry="15" fill="#c9952e" stroke="#2b1d10" stroke-width="3"/><circle cx="210" cy="94" r="4" fill="#fff"/><circle cx="220" cy="94" r="4" fill="#fff"/><path d="M178 120 L205 110" stroke="#2b1d10" stroke-width="6" stroke-linecap="round"/></svg>`,
+};
+let PASS = null;    // { p, clue, sceneId }
+function wordsHtml(text) {
+  return text.split(/(\s+)/).map(tok => {
+    if (!tok.trim()) return tok;
+    const m = tok.match(/^([^A-Za-z0-9_]*)_([A-Za-z]+)_(.*)$/);
+    if (m) return `${esc(m[1])}<span class="w vocab" data-w="${esc(m[2])}">${esc(m[2])}</span>${esc(m[3])}`;
+    const clean = tok.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '');
+    return clean ? `<span class="w" data-w="${esc(clean)}">${esc(tok)}</span>` : esc(tok);
+  }).join('');
+}
+function renderPassage(clue, sceneId) {
+  const lvl = save.settings.level || 2;
+  const p = parsePassage(clue['l' + lvl]);
+  PASS = { p, clue, sceneId };
+  const cols = Array.from({ length: p.cols }, () => []);
+  for (const b of p.blocks) if (b.t !== 'sep') cols[b.col].push(b);
+  const unit = u => `<span class="u" data-u="${u.i}">${wordsHtml(u.text)}</span>`;
+  const html = cols.map(bs => {
+    let out = '', table = '';
+    const flush = () => { if (table) { out += `<table>${table}</table>`; table = ''; } };
+    for (const b of bs) {
+      if (b.t === 'th') { flush(); table = `<tr>${b.cells.map(c => `<th>${wordsHtml(c)}</th>`).join('')}</tr>`; continue; }
+      if (b.t === 'row') { table += `<tr class="u rowu" data-u="${b.units[0].i}">${b.cells.map(c => `<td>${wordsHtml(c)}</td>`).join('')}</tr>`; continue; }
+      flush();
+      if (b.t === 'map') { const m = MAPS[b.id]; out += `<div class="map"><svg viewBox="0 0 ${m.w} ${m.h}" preserveAspectRatio="none" aria-hidden="true">${m.svg}</svg>${b.units.map(u => `<span class="u" data-u="${u.i}" style="left:${u.x}%;top:${u.y}%">${wordsHtml(u.text)}</span>`).join('')}</div>`; continue; }
+      const inner = b.units.map(unit).join(' ');
+      if (b.t === 'h1') out += `<div class="h1">${inner}</div>`;
+      else if (b.t === 'h2') out += `<div class="h2">${inner}</div>`;
+      else if (b.t === 'cap') out += `${PICS[sceneId] || ''}<div class="cap">${inner}</div>`;
+      else out += `<p>${inner}</p>`;
+    }
+    flush();
+    return `<div class="col">${out}</div>`;
+  }).join('');
+  const t = $('ptext');
+  t.innerHTML = html; t.scrollTop = 0;
+  t.style.setProperty('--fs', ({ 1: '26px', 2: '24px', 3: '22px' })[lvl]);
+  $('paper').className = 'paper k-' + clue.kind;
+  $('clueLab').textContent = clue.label;
+  $('readAll').style.display = save.settings.readAloud ? '' : 'none';
+}
+const unitsFor = keys => [...$('ptext').querySelectorAll('.u')].filter(el => keys.includes(PASS.p.units[+el.dataset.u].key));
+function glow(keys, cls = 'look') { const els = unitsFor(keys || []); els.forEach(el => el.classList.add(cls)); if (els[0]) els[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+function clearGlow() { $('ptext').querySelectorAll('.look,.proof,.wrongpick,.sel').forEach(el => el.classList.remove('look', 'proof', 'wrongpick', 'sel')); }
+let pickHandler = null;
+$('ptext').addEventListener('click', e => {
+  if (pickHandler) { const u = e.target.closest('.u'); if (u) pickHandler(u); return; }
+  const w = e.target.closest('.w'); if (!w) return;
+  speak(w.dataset.w, .75); w.classList.add('said'); setTimeout(() => w.classList.remove('said'), 700);
+});
+$('readAll').onclick = () => speak(PASS.p.units.map(u => plainText(u.text)).join('. ').replace(/\.\./g, '.'));
+
+/* =====================================================================
+   Questions
+   ===================================================================== */
+const qp = $('qpanel');
+function qShell(tag, text, sayText) {
+  qp.innerHTML = `<div class="qhead"><div style="flex:1"><div class="tagl">${esc(tag)}</div><div class="qtext">${esc(text)}</div></div><button class="ico" data-say aria-label="Read the question">🔊</button></div><div class="opts"></div><div class="qmsg" aria-live="polite"></div><div class="qfoot"></div>`;
+  qp.querySelector('[data-say]').onclick = () => speak(sayText || text);
+  return { opts: qp.querySelector('.opts'), msg: qp.querySelector('.qmsg'), foot: qp.querySelector('.qfoot') };
+}
+const LETTERS = 'ABCD';
+function gotIt(foot, res, label = 'Got it') { const b = document.createElement('button'); b.className = 'btn sm go'; b.textContent = label; b.dataset.got = '1'; b.onclick = () => { SFX.tap(); res(); }; foot.appendChild(b); }
+
+function askMC(q, tag) {
+  return new Promise(res => {
+    const opts = shuffle(q.opts.map(o => ({ t: o.replace(/^\*/, ''), right: o.startsWith('*') })));
+    const ui = qShell(tag, q.q, q.q + ' ' + opts.map((o, i) => `${LETTERS[i]}: ${o.t}.`).join(' '));
+    CUR = { id: q.id, type: 'mc', skill: q.skill, q: q.q, opts: opts.map(o => o.t), answer: opts.findIndex(o => o.right) };
+    let tries = 0, done = false;
+    opts.forEach((o, i) => {
+      const b = document.createElement('button'); b.className = 'opt'; b.dataset.i = i;
+      b.innerHTML = `<span class="n">${LETTERS[i]}</span>${esc(o.t)}`;
+      b.onclick = () => {
+        if (done || b.disabled) return;
+        if (o.right) {
+          done = true; b.classList.add('right'); SFX.ding(); if (tries === 0) record(q, true);
+          ui.opts.querySelectorAll('.opt').forEach(x => x.disabled = true);
+          ui.msg.textContent = tries === 0 ? 'Yes! You read that carefully.' : 'Yes! That was it.';
+          clearGlow(); later(900).then(() => res(tries === 0));
+          return;
+        }
+        tries++; b.classList.add('wrong'); b.disabled = true; SFX.buzz();
+        if (tries === 1) { record(q, false); ui.msg.textContent = '🕯️ ' + q.hint; glow(q.look); }
+        else {
+          done = true; ui.opts.querySelectorAll('.opt').forEach(x => { x.disabled = true; if (opts[+x.dataset.i].right) x.classList.add('right'); });
+          clearGlow(); glow(q.ev || q.look, 'proof');
+          ui.msg.textContent = `It's "${opts[CUR.answer].t}"` + ((q.ev || q.look) ? ' The green part of the clue shows it.' : '');
+          gotIt(ui.foot, () => { clearGlow(); res(false); });
+        }
+      };
+      ui.opts.appendChild(b);
+    });
+  });
+}
+
+function askEvidence(q, tag) {
+  return new Promise(res => {
+    const prompt = q.evq || 'Part B: Tap the sentence that proves your answer.';
+    const ui = qShell(tag, prompt.replace(/^Part B: /, ''), prompt);
+    qp.querySelector('.tagl').textContent = 'Part B · find the proof';
+    const right = unitsFor(q.ev).map(el => +el.dataset.u);
+    CUR = { id: q.id, type: 'evidence', skill: q.skill, q: prompt, keys: q.ev, answer: right };
+    $('ptext').classList.add('pick');
+    let sel = null, tries = 0;
+    const btn = document.createElement('button'); btn.className = 'btn sm go'; btn.textContent = 'This proves it ✔'; btn.disabled = true; btn.dataset.prove = '1';
+    ui.foot.appendChild(btn);
+    ui.msg.textContent = 'Tap a sentence in the clue, then tap the button.';
+    const end = first => { pickHandler = null; $('ptext').classList.remove('pick'); res(first); };
+    pickHandler = el => { if (sel) sel.classList.remove('sel'); sel = el; el.classList.add('sel'); btn.disabled = false; SFX.tap(); };
+    btn.onclick = () => {
+      if (!sel) return;
+      const k = +sel.dataset.u;
+      if (right.includes(k)) {
+        sel.classList.remove('sel'); sel.classList.add('proof'); SFX.ding(); if (tries === 0) record(q, true, 'ev');
+        btn.remove(); ui.msg.textContent = 'That sentence proves it. Nice detective work!';
+        later(1100).then(() => { clearGlow(); end(tries === 0); });
+        return;
+      }
+      tries++; SFX.buzz(); sel.classList.remove('sel'); sel.classList.add('wrongpick');
+      const was = sel; sel = null; btn.disabled = true; setTimeout(() => was.classList.remove('wrongpick'), 900);
+      if (tries === 1) { record(q, false, 'ev'); ui.msg.textContent = '🕯️ Close! Read your answer again, then find the sentence that says the same thing in different words.'; }
+      else {
+        btn.remove(); pickHandler = null; $('ptext').classList.remove('pick');
+        glow(q.ev, 'proof'); ui.msg.textContent = 'This is the sentence that proves it. It is lit up in green.';
+        gotIt(ui.foot, () => { clearGlow(); res(false); });
+      }
+    };
+  });
+}
+
+function askOrder(q, tag) {
+  return new Promise(res => {
+    const items = shuffle(q.items.map((t, i) => ({ t, i })));
+    const ui = qShell(tag, q.q, q.q + ' ' + items.map(o => o.t).join(' '));
+    CUR = { id: q.id, type: 'order', skill: q.skill, q: q.q, items: items.map(o => o.t), answer: q.items.map((_, k) => items.findIndex(o => o.i === k)) };
+    let picked = [], tries = 0, done = false;
+    const btns = items.map((o, i) => {
+      const b = document.createElement('button'); b.className = 'opt'; b.dataset.i = i;
+      const paint = () => { const n = picked.indexOf(i); b.innerHTML = `<span class="n" style="${n < 0 ? 'background:#bbb' : ''}">${n < 0 ? '?' : n + 1}</span>${esc(o.t)}`; };
+      b.paint = paint; paint();
+      b.onclick = () => {
+        if (done || picked.includes(i)) return;
+        picked.push(i); SFX.tap(); btns.forEach(x => x.paint());
+        if (picked.length < items.length) return;
+        const ok = picked.every((p, k) => items[p].i === k);
+        if (ok) { done = true; SFX.ding(); btns.forEach(x => x.classList.add('right')); if (tries === 0) record(q, true); ui.msg.textContent = 'Yes! That is the right order.'; later(1000).then(() => res(tries === 0)); return; }
+        tries++; SFX.buzz();
+        if (tries === 1) { record(q, false); ui.msg.textContent = '🕯️ ' + q.hint; btns.forEach(x => x.classList.add('wrong')); setTimeout(() => { picked = []; btns.forEach(x => { x.classList.remove('wrong'); x.paint(); }); }, 900); }
+        else { done = true; picked = CUR.answer.slice(); btns.forEach(x => { x.paint(); x.classList.add('right'); }); ui.msg.textContent = 'Here is the right order. Read it top to bottom.'; gotIt(ui.foot, () => res(false)); }
+      };
+      ui.opts.appendChild(b);
+      return b;
+    });
+    const reset = document.createElement('button'); reset.className = 'btn sm'; reset.textContent = '↺ Start over';
+    reset.onclick = () => { if (done) return; picked = []; btns.forEach(x => x.paint()); };
+    ui.foot.appendChild(reset);
+  });
+}
+
+async function ask(q, tag) {
+  if (q.type === 'order') { const r = await askOrder(q, tag); CUR = null; return r; }
+  const a = await askMC(q, q.ev ? tag + ' · Part A' : tag);
+  CUR = null;
+  if (!q.ev) return a;
+  const b = await askEvidence(q, tag);
+  CUR = null;
+  return a && b;
+}
+
+function showClue(scene) { renderPassage(scene.clue, scene.id); $('clue').classList.add('on'); SFX.page(); wickHide(); }
+function hideClue() { $('clue').classList.remove('on'); pickHandler = null; CUR = null; hush(); }
+function readOnly(scene, keys) {
+  return new Promise(res => {
+    showClue(scene); if (keys) glow(keys);
+    const ui = qShell('Clue', scene.clue.title, scene.clue.title);
+    ui.msg.textContent = 'Tap any word to hear it.';
+    gotIt(ui.foot, () => { hideClue(); res(); }, 'Done reading');
+  });
+}
+
+async function runClue(scene) {
+  S.mode = 'card'; showClue(scene);
+  const core = shuffle(scene.clue.qs.filter(q => !q.extra));
+  let all = true;
+  for (let i = 0; i < core.length; i++) if (!(await ask(core[i], `Question ${i + 1} of ${core.length}`))) all = false;
+  const ex = scene.clue.qs.find(q => q.extra && RUN.due.includes(q.skill));
+  if (ex) { RUN.due.splice(RUN.due.indexOf(ex.skill), 1); await ask(ex, 'Bonus question'); }
+  RUN.star[scene.id] = all;
+  await new Promise(res => {
+    const ui = qShell('Clue earned', `"${scene.clue.title}" goes on your Clue Board!`);
+    ui.msg.textContent = all ? '⭐ Every answer right on the first try!' : 'You can reread it any time on the Clue Board.';
+    SFX.pin(); gotIt(ui.foot, res, 'Pin it 📌');
+  });
+  hideClue();
+}
+
+/* =====================================================================
+   Explore: hotspots, walking, the creature
+   ===================================================================== */
+function spotList() {
+  if (!WORLD.art) return [];
+  const sc = WORLD.sc, a = WORLD.art, out = [];
+  for (const [id, b] of Object.entries(a.spots)) {
+    if (id === 'clue') out.push({ id, kind: 'clue', b, label: WORLD.earned ? 'Reread' : null });
+    else if (id === 'exit') out.push({ id, kind: 'exit', b });
+    else if (sc.looks[id]) out.push({ id, kind: 'look', b });
+  }
+  if (a.doors) for (const o of sc.doors.opts) out.push({ id: 'door:' + o.id, kind: 'door', b: SPOT(a.doors[o.id], FLOOR - DOOR_H / 2, DOOR_W + 20, DOOR_H), label: o.label, door: o });
+  return out;
+}
+function layoutSpots() {
+  const box = $('spots');
+  const show = S.mode === 'explore';
+  box.style.display = show ? '' : 'none';
+  if (!show) return;
+  box.innerHTML = '';
+  for (const s of spotList()) {
+    const p = toScreen(s.b.x - s.b.w / 2, s.b.y - s.b.h / 2);
+    const el = document.createElement('button'); el.className = 'spot'; el.dataset.spot = s.id;
+    el.style.cssText = `left:${p.x}px;top:${p.y}px;width:${s.b.w * SC}px;height:${s.b.h * SC}px`;
+    el.setAttribute('aria-label', s.kind === 'clue' ? WORLD.sc.clue.label : s.kind === 'exit' ? 'Go on' : s.kind === 'door' ? s.label : s.id);
+    if (s.kind === 'door' && WORLD.doorAsk) el.innerHTML = `<span class="tag">${esc(s.label)}</span>`;
+    el.onclick = e => { e.stopPropagation(); ac(); onSpot(s); };
+    box.appendChild(el);
+  }
+}
+function walkTo(x, then) { WORLD.tx = clamp(x, 90, W - 90); WORLD.pending = then || null; }
+function onSpot(s) {
+  if (WORLD.busy || S.mode !== 'explore') return;
+  if (WORLD.hidden || WORLD.hiding) return;
+  SFX.tap();
+  const x = s.kind === 'look' || s.kind === 'clue' ? s.b.x - 60 : s.b.x;
+  if (s.kind === 'clue') return walkTo(x, () => WORLD.earned ? (calmCreature(), S.mode = 'card', readOnly(WORLD.sc).then(() => { S.mode = 'explore'; layoutSpots(); })) : openSceneClue());
+  if (s.kind === 'look') return walkTo(x, () => { wickSay(WORLD.sc.looks[s.id]); if (s.id === 'portrait') WORLD.tilt = -WORLD.tilt; });
+  if (s.kind === 'exit') {
+    if (!WORLD.earned) return wickSay('Find the clue first. Look for the glowing paper.');
+    return walkTo(x, () => leaveScene());
+  }
+  if (s.kind === 'door') {
+    if (!WORLD.earned) return wickSay('Read the clue before you pick a door. Doors around here bite.');
+    return walkTo(x, () => chooseDoor(s.door));
+  }
+}
+cv.addEventListener('pointerdown', e => {
+  ac();
+  if (S.mode !== 'explore' || WORLD.busy || WORLD.hidden || WORLD.hiding) return;
+  const p = toWorld(e.clientX, e.clientY);
+  if (p.y < 300) return;
+  walkTo(p.x, null);
+});
+
+function calmCreature() {
+  const cr = WORLD.cr;
+  if (cr.k === 'lamplighter' && cr.state !== 'away') { cr.state = 'away'; cr.t = rand(6, 9); cr.x = -400; }
+  if (cr.k === 'tock' && cr.state !== 'closed') { cr.state = 'closed'; cr.t = rand(3, 4.5); }
+  WORLD.hidden = WORLD.hiding = false; setAct(null);
+}
+async function openSceneClue() {
+  calmCreature(); layoutSpots();
+  await runClue(WORLD.sc);
+  WORLD.earned = true;
+  if (!RUN.clues.includes(WORLD.sc.id)) RUN.clues.push(WORLD.sc.id);
+  persist();
+  S.mode = 'explore';
+  if (WORLD.sc.doors) {
+    WORLD.doorAsk = true; showDoorBar();
+    wickSay(WORLD.sc.doors.gates ? 'Now pick a path. Take your time. The paths are not going anywhere.' : 'Now pick a door. Take your time. The doors are not going anywhere.', { up: true });
+  } else wickSay(RUN.s === caseData().scenes.length - 1 ? 'That was the last clue! Tap the arrow to open the Clue Board.' : 'Clue earned! Tap the arrow to keep going.');
+  layoutSpots(); updHud();
+}
+
+/* ---------- doors ---------- */
+function showDoorBar() {
+  const d = WORLD.sc.doors;
+  $('doorQ').textContent = d.q; $('doorbar').classList.add('on');
+  CUR = { id: d.id, type: 'door', skill: d.skill, q: d.q, doors: d.opts.map(o => o.id), answer: d.opts.find(o => o.right).id };
+}
+$('doorSay').onclick = () => { const d = WORLD.sc.doors; speak(d.q + ' ' + d.opts.map(o => o.label).join('. ')); };
+$('doorRead').onclick = async () => { if (WORLD.busy) return; calmCreature(); S.mode = 'card'; $('doorbar').classList.remove('on'); await readOnly(WORLD.sc, WORLD.doorTries ? WORLD.sc.doors.look : null); S.mode = 'explore'; showDoorBar(); layoutSpots(); };
+async function chooseDoor(o) {
+  const d = WORLD.sc.doors;
+  if (!WORLD.doorAsk) return;
+  WORLD.busy = true;
+  if (o.right) {
+    if (WORLD.doorTries === 0) record({ id: d.id, skill: d.skill }, true);
+    $('doorbar').classList.remove('on'); WORLD.doorAsk = false; CUR = null;
+    SFX.creak(); WORLD.opened = o.id;
+    for (let i = 0; i <= 10; i++) { WORLD.opening = i / 10; await later(50); }
+    wickSay(WORLD.doorTries === 0 ? 'You read that just right. In we go!' : 'Phew. In we go!');
+    await later(500); WORLD.busy = false; return leaveScene();
+  }
+  WORLD.doorTries++;
+  if (WORLD.doorTries === 1) record({ id: d.id, skill: d.skill }, false);
+  await scare(o.id);
+  WORLD.tx = WORLD.px = clamp(WORLD.px - 180, 90, W - 90);
+  if (WORLD.doorTries === 1) wickSay('🕯️ ' + d.hint, { up: true, ms: 9000 });
+  else { WORLD.doorReveal = true; wickSay(d.reveal, { up: true, ms: 9000 }); }
+  WORLD.busy = false; layoutSpots();
+}
+async function scare(doorId) {
+  const kind = caseData().creature;
+  SFX.whoosh(); WORLD.lanternOut = 1; WORLD.peek = 0; WORLD.peekAt = WORLD.art.doors ? WORLD.art.doors[doorId] : WORLD.px + 200;
+  await later(350);
+  if (kind === 'mumbles') SFX.boo(); else if (kind === 'lamplighter') SFX.shoo(); else SFX.hoot();
+  for (let i = 0; i <= 10; i++) { WORLD.peek = i / 10; await later(40); }
+  wickSay({ mumbles: 'BOO! ...Sorry. Force of habit. (That was Mumbles.)', lamplighter: '"SHOO! Not that way!" The Lamplighter blew your lantern out!', tock: 'HOO-HOO! Tock\'s eyes glowed in the dark. Wrong door!' }[kind], { up: true, ms: 2600 });
+  await later(1300);
+  for (let i = 10; i >= 0; i--) { WORLD.peek = i / 10; await later(30); }
+  WORLD.lanternOut = 0; SFX.ding();
+}
+
+/* ---------- scene flow ---------- */
+function enterScene(i) {
+  RUN.s = i; persist();
+  const sc = caseData().scenes[i];
+  WORLD = Object.assign(W0(), { c: RUN.c, s: i, sc, art: ART[sc.art], earned: RUN.clues.includes(sc.id), fade: 1 });
+  WORLD.px = WORLD.tx = WORLD.art.start;
+  initCreature();
+  if (WORLD.earned && sc.doors) { WORLD.doorAsk = true; showDoorBar(); }
+  else $('doorbar').classList.remove('on');
+  S.mode = 'explore'; updHud(); layoutSpots();
+  if (i === 0 && !RUN.started) { RUN.started = true; persist(); later(700).then(() => { if (S.mode === 'explore') wickSay(caseData().wickStart, { ms: 8000 }); }); }
+}
+async function leaveScene() {
+  WORLD.busy = true;
+  for (let i = 0; i <= 8; i++) { WORLD.fade = i / 8; await later(40); }
+  const last = RUN.s === caseData().scenes.length - 1;
+  WORLD.busy = false;
+  if (last) return openBoard();
+  enterScene(RUN.s + 1);
+}
+function updHud() {
+  const on = ['explore', 'card'].includes(S.mode) && RUN;
+  $('hud').classList.toggle('on', !!on);
+  if (!on) return;
+  const c = caseData();
+  $('where').innerHTML = `${esc(WORLD.sc.name)}<small>Case ${c.id}: ${esc(c.title)} · clue ${Math.min(RUN.clues.length + (WORLD.earned ? 0 : 1), 5)} of 5</small>`;
+}
+
+/* ---------- creatures (they only move while you explore, never while a passage is open) ---------- */
+function initCreature() {
+  const k = caseData().creature, cr = WORLD.cr = { k, t: 0 };
+  if (k === 'mumbles') Object.assign(cr, { x: 900, y: 300, prank: 6, shown: RUN.s === 0 ? 2.5 : 999 });
+  if (k === 'lamplighter') Object.assign(cr, { state: 'away', t: RUN.s === 0 ? 9 : rand(7, 11), x: -400, dir: 1, introduced: RUN.s > 0 });
+  if (k === 'tock') Object.assign(cr, { state: 'closed', t: RUN.s === 0 ? 6 : rand(3.5, 5.5), open: 0, turn: 0, introduced: RUN.s > 0 });
+  setAct(null);
+}
+function setAct(label, warn, fn) {
+  const b = $('act');
+  if (!label) { b.classList.remove('on', 'warn'); b.onclick = null; b.dataset.act = ''; return; }
+  b.textContent = label; b.dataset.act = label; b.classList.add('on'); b.classList.toggle('warn', !!warn); b.onclick = () => { ac(); fn && fn(); };
+}
+async function caught(line) {
+  WORLD.busy = true; WORLD.walking = false; WORLD.pending = null; WORLD.shake = .5;
+  RUN.caught = (RUN.caught || 0) + 1;
+  wickSay(line, { up: true, ms: 2500 });
+  await later(1300);
+  WORLD.fade = 1; WORLD.px = WORLD.tx = WORLD.art.start; WORLD.hiding = WORLD.hidden = false;
+  await later(200); WORLD.busy = false;
+}
+function hideNow() {
+  const hs = WORLD.art.hides || [];
+  if (!hs.length) return;
+  const h = hs.map(x => x[0]).reduce((a, b) => Math.abs(b - WORLD.px) < Math.abs(a - WORLD.px) ? b : a);
+  WORLD.pending = null; WORLD.tx = h; WORLD.hiding = true; SFX.step();
+}
+function updCreature(dt) {
+  const cr = WORLD.cr, paused = WORLD.busy || WORLD.doorAsk;
+  WORLD.flick = Math.max(0, WORLD.flick - dt * 2);
+  if (cr.k === 'mumbles') {
+    cr.t += dt;
+    cr.x = 720 + Math.sin(cr.t * .35) * 560; cr.y = 260 + Math.sin(cr.t * .9) * 60;
+    if (Math.abs(cr.x - WORLD.px) < 300) WORLD.flick = Math.max(WORLD.flick, .4);
+    cr.prank -= dt;
+    if (cr.prank <= 0 && !paused) { cr.prank = rand(8, 12); SFX.giggle(); WORLD.tilt = (Math.random() < .5 ? -1 : 1) * rand(.1, .3); WORLD.flick = 1; }
+    if (cr.shown < 900) { cr.shown -= dt; if (cr.shown <= 0) { cr.shown = 999; wickSay(WORLD.sc.creatureLine || caseData().scenes[0].creatureLine, { ms: 7000 }); } }
+    return;
+  }
+  if (paused) { if (cr.k === 'lamplighter' && cr.state !== 'walk') setAct(null); return; }
+  if (cr.k === 'lamplighter') {
+    cr.t -= dt;
+    if (cr.state === 'away' && cr.t <= 0) { cr.state = 'warn'; cr.t = 2.8; if (!cr.introduced) { cr.introduced = true; wickSay("My flame's wobbling! Someone's coming. Tap HIDE!", { up: true, ms: 3000 }); } }
+    if (cr.state === 'warn') { WORLD.flick = 1; if (!WORLD.hiding && !WORLD.hidden) setAct('HIDE!', true, hideNow); else setAct(null); if (cr.t <= 0) { cr.state = 'walk'; cr.dir = Math.random() < .5 ? 1 : -1; cr.x = cr.dir > 0 ? -220 : W + 220; } }
+    if (cr.state === 'walk') {
+      WORLD.flick = 1; cr.x += cr.dir * 330 * dt;
+      if (!WORLD.hiding && !WORLD.hidden) setAct('HIDE!', true, hideNow); else setAct(null);
+      if (!WORLD.hidden && Math.abs(cr.x - WORLD.px) < 170) { setAct(null); cr.state = 'gone'; caught('"SHOO! Off the platform!" The Lamplighter spotted you. Back to the start!').then(() => { cr.state = 'away'; cr.t = rand(8, 12); cr.x = -400; }); return; }
+      if ((cr.dir > 0 && cr.x > W + 240) || (cr.dir < 0 && cr.x < -240)) { cr.state = 'away'; cr.t = rand(9, 14); WORLD.hidden = WORLD.hiding = false; setAct(null); if (!cr.passed) { cr.passed = true; wickSay(caseData().scenes[0].creatureLine + ' Okay. Breathing again.'); } }
+    }
+    return;
+  }
+  if (cr.k === 'tock') {
+    cr.t -= dt;
+    if (cr.state === 'closed') { cr.open = Math.max(0, cr.open - dt * 4); cr.turn = Math.max(0, cr.turn - dt); if (cr.t <= 0) { cr.state = 'turn'; cr.t = 1.5; SFX.tick(); if (!cr.introduced) { cr.introduced = true; wickSay(caseData().scenes[0].creatureLine, { up: true, ms: 2500 }); } } }
+    else if (cr.state === 'turn') { WORLD.flick = 1; cr.turn = Math.min(1, cr.turn + dt / 1.5); cr.open = Math.min(1, cr.open + dt * .7); if (cr.t <= 0) { cr.state = 'open'; cr.t = 2.6; cr.open = 1; SFX.hoot(); } }
+    else if (cr.state === 'open') {
+      WORLD.flick = 1;
+      if (WORLD.walking) { cr.state = 'gone'; setAct(null); caught('"HOO-HOO!" Tock saw you move. Back to the start!').then(() => { cr.state = 'closed'; cr.t = rand(3.5, 5); }); return; }
+      if (cr.t <= 0) { cr.state = 'closed'; cr.t = rand(3.5, 5.5); SFX.tick(); }
+    }
+    if ((cr.state === 'turn' || cr.state === 'open') && WORLD.walking) setAct('FREEZE ✋', true, () => { WORLD.tx = WORLD.px; WORLD.pending = null; WORLD.walking = false; setAct(null); });
+    else if (cr.state !== 'turn' && cr.state !== 'open') setAct(null);
+  }
+}
+function updWorld(dt) {
+  if (WORLD.fade > 0 && !WORLD.busy) WORLD.fade = Math.max(0, WORLD.fade - dt * 2.5);
+  if (WORLD.shake > 0) WORLD.shake -= dt;
+  if (!WORLD.busy) {
+    const d = WORLD.tx - WORLD.px, sp = (WORLD.hiding ? 900 : 430) * dt;
+    if (Math.abs(d) > 3) { WORLD.walking = true; WORLD.face = Math.sign(d); WORLD.px += clamp(d, -sp, sp); WORLD.phase += dt * 12; if (Math.floor(WORLD.phase / Math.PI) !== Math.floor((WORLD.phase - dt * 12) / Math.PI)) SFX.step(); }
+    else if (WORLD.walking) {
+      WORLD.walking = false; WORLD.px = WORLD.tx;
+      if (WORLD.hiding) { WORLD.hiding = false; WORLD.hidden = true; setAct(null); }
+      const f = WORLD.pending; WORLD.pending = null; if (f) f();
+    }
+  }
+  updCreature(dt);
+}
+
+/* ---------- drawing the world ---------- */
+const dk = document.createElement('canvas'); dk.width = W / 2; dk.height = H / 2; const dctx = dk.getContext('2d');
+function darkness(lights, alpha) {
+  dctx.globalCompositeOperation = 'source-over'; dctx.clearRect(0, 0, dk.width, dk.height);
+  dctx.fillStyle = `rgba(6,4,20,${alpha})`; dctx.fillRect(0, 0, dk.width, dk.height);
+  dctx.globalCompositeOperation = 'destination-out';
+  for (const [x, y, r, a = 1] of lights) { const g = dctx.createRadialGradient(x / 2, y / 2, 0, x / 2, y / 2, r / 2); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(.6, `rgba(0,0,0,${a * .7})`); g.addColorStop(1, 'rgba(0,0,0,0)'); dctx.fillStyle = g; dctx.fillRect(x / 2 - r / 2, y / 2 - r / 2, r, r); }
+  ctx.drawImage(dk, 0, 0, W, H);
+}
+function drawWorld() {
+  const w = WORLD, a = w.art; if (!a) return;
+  ctx.save();
+  if (w.shake > 0) ctx.translate(rand(-10, 10), rand(-6, 6));
+  a.draw({ earned: w.earned, opened: w.opened, opening: w.opening, tilt: w.tilt, arrow: true });
+  // hotspot sparkles for looks
+  for (const s of spotList()) if (s.kind === 'look') { const p = .5 + .5 * Math.sin(S.t * 2 + s.b.x); circ(s.b.x + s.b.w / 2 - 10, s.b.y - s.b.h / 2 + 10, 5 + p * 3, `rgba(255,240,180,${.4 + .4 * p})`); }
+  if (w.doorAsk && w.doorReveal && a.doors) { const r = w.sc.doors.opts.find(o => o.right); glowAt(a.doors[r.id], FLOOR - 150, 200, `rgba(120,255,140,${.3 + .2 * Math.sin(S.t * 5)})`); }
+  const cr = w.cr;
+  if (cr.k === 'mumbles') drawMumbles(cr.x, cr.y, { a: .75, scale: .9 });
+  if (cr.k === 'tock' && a.perch) drawTock(a.perch[0], a.perch[1], { open: cr.open, turn: cr.turn, scale: 1.1 });
+  const coat = save.coat || COATS[0];
+  drawKid(w.px, FLOOR, { face: w.face, phase: w.walking ? w.phase : 0, coat, crouch: w.hidden ? 1 : 0, lantern: !w.lanternOut });
+  drawWick(w.px - w.face * 60, FLOOR - 250 + Math.sin(S.t * 3) * 8, w.flick);
+  // hide props drawn over a hidden kid
+  if (w.hidden && a.hides) {
+    const h = a.hides.find(x => Math.abs(x[0] - w.px) < 20);
+    if (h) { const [x, k] = h; if (k === 'bush') bush(x, w.sc.art === 'bridgePath' ? 1.1 : .9); else if (k === 'crate') crate(x, 120, 100); else if (k === 'bench') bench(x); else if (k === 'chair') { rr(x - 60, 700, 130, 30, 8, '#8a3a3a', INK, 4); rr(x - 54, 560, 30, 160, 8, '#8a3a3a', INK, 4); } else rr(x - 60, 640, 120, 240, 6, '#5a3d28', INK, 5); }
+  }
+  if (cr.k === 'lamplighter' && (cr.state === 'walk' || cr.state === 'gone')) drawLamplighter(cr.x, { t: S.t, beam: 1 });
+  const lights = (a.lights || []).slice();
+  if (!w.lanternOut) lights.push([w.px + w.face * 60, FLOOR - 70, 520], [w.px, FLOOR - 160, 360, .8]);
+  if (cr.k === 'lamplighter' && cr.state === 'walk') lights.push([cr.x + 120, FLOOR - 420, 300]);
+  if (cr.k === 'tock' && a.perch && cr.open > .2) lights.push([a.perch[0], a.perch[1] - 10, 120 * cr.open]);
+  darkness(lights, w.lanternOut ? .93 : .5);
+  if (w.peek > 0) {
+    const x = w.peekAt || w.px + 200;
+    if (cr.k === 'mumbles') drawMumbles(x, FLOOR - 220 + (1 - w.peek) * 200, { a: w.peek, scale: 1.3, peek: true });
+    if (cr.k === 'lamplighter') { ctx.globalAlpha = w.peek; circ(x - 18, 520, 12, '#ffe06a'); circ(x + 18, 520, 12, '#ffe06a'); glowAt(x, 520, 80, 'rgba(255,224,106,.5)'); ctx.globalAlpha = 1; }
+    if (cr.k === 'tock') { ctx.globalAlpha = w.peek; for (const dx of [-40, 40]) { glowAt(x + dx, 500, 70, 'rgba(255,220,60,.7)'); circ(x + dx, 500, 26, '#ffd23f'); circ(x + dx, 500, 10, INK); } ctx.globalAlpha = 1; }
+  }
+  if (w.fade > 0) R(0, 0, W, H, `rgba(0,0,0,${w.fade})`);
+  ctx.restore();
+}
+
+/* =====================================================================
+   Clue Board finale
+   ===================================================================== */
+const KIND_ICON = { note: '📝', sign: '🪧', diary: '📔', news: '📰', letter: '✉️', notes: '🗒️', log: '📒', map: '🗺️', poster: '📣', notebook: '📓' };
+async function openBoard() {
+  S.mode = 'board'; layoutSpots(); updHud(); setAct(null); wickHide(); $('doorbar').classList.remove('on');
+  const c = caseData(), f = c.finale, b = $('board');
+  const pins = () => c.scenes.map((s, i) => `<div class="pin" data-pin="${i}" role="button" tabindex="0"><span class="k">${KIND_ICON[s.clue.kind] || '📄'}</span>${esc(s.clue.title)}${RUN.star[s.id] ? '<span class="st">⭐</span>' : ''}<button class="btn sm read" data-read="${i}">📖 Read</button></div>`).join('');
+  b.innerHTML = `<div class="bq"><div class="tagl" style="font-weight:700;color:#7a5d9e">CLUE BOARD · Case ${c.id}</div><div class="qtext" id="bQ"></div><button class="ico" id="bSay" style="margin:6px auto" aria-label="Read the question">🔊</button><div class="sus" id="bOpts"></div><div class="qmsg" id="bMsg"></div><div class="qfoot" id="bFoot"></div></div><div class="pins" id="pins">${pins()}</div>`;
+  b.classList.add('on'); SFX.pin();
+  b.querySelectorAll('[data-read]').forEach(el => el.onclick = async e => { e.stopPropagation(); await readOnly(c.scenes[+el.dataset.read]); });
+  const msg = $('bMsg'), foot = $('bFoot');
+  // step 1: who / where / why
+  await new Promise(res => {
+    const opts = shuffle(f.opts.slice());
+    $('bQ').textContent = f.q;
+    $('bSay').onclick = () => speak(f.q + ' ' + opts.map(o => o.label).join('. '));
+    CUR = { id: `c${c.id}-finale`, type: 'finale', q: f.q, opts: opts.map(o => o.label), answer: opts.findIndex(o => o.right) };
+    let tries = 0, done = false;
+    opts.forEach((o, i) => {
+      const bt = document.createElement('button'); bt.className = 'opt'; bt.dataset.i = i; bt.textContent = o.label;
+      bt.onclick = () => {
+        if (done || bt.disabled) return;
+        if (o.right) { done = true; bt.classList.add('right'); SFX.ding(); if (!tries) record({ id: CUR.id, skill: 'inference' }, true); msg.textContent = 'Yes! Now prove it.'; later(900).then(res); return; }
+        tries++; bt.classList.add('wrong'); bt.disabled = true; SFX.buzz();
+        if (tries === 1) { record({ id: CUR.id, skill: 'inference' }, false); msg.textContent = '🕯️ ' + f.hint + ' (Tap 📖 to reread a clue.)'; }
+        else { done = true; $('bOpts').querySelectorAll('.opt').forEach(x => { x.disabled = true; if (opts[+x.dataset.i].right) x.classList.add('right'); }); msg.textContent = `It's "${f.opts.find(o => o.right).label}". Now find the proof.`; gotIt(foot, () => { foot.innerHTML = ''; res(); }, 'Okay'); }
+      };
+      $('bOpts').appendChild(bt);
+    });
+  });
+  // step 2: choose the two clues that prove it
+  await new Promise(res => {
+    const right = f.proof.map(id => c.scenes.findIndex(s => s.id === id));
+    $('bQ').textContent = `"${f.opts.find(o => o.right).label}." Tap the 2 clues that PROVE it.`;
+    $('bOpts').innerHTML = ''; msg.textContent = 'Tap a clue card to pick it. Tap 📖 to reread one.';
+    $('bSay').onclick = () => speak($('bQ').textContent);
+    CUR = { id: `c${c.id}-proof`, type: 'proof', answer: right.slice().sort() };
+    let sel = [], tries = 0, done = false;
+    const go = document.createElement('button'); go.className = 'btn go'; go.textContent = 'These prove it! 📌'; go.disabled = true; go.dataset.prove = '1'; foot.innerHTML = ''; foot.appendChild(go);
+    const paint = () => { b.querySelectorAll('.pin').forEach(p => p.classList.toggle('sel', sel.includes(+p.dataset.pin))); go.disabled = sel.length !== 2; };
+    b.querySelectorAll('.pin').forEach(p => p.onclick = e => {
+      if (done || e.target.closest('[data-read]')) return;
+      const i = +p.dataset.pin; SFX.tap();
+      if (sel.includes(i)) sel = sel.filter(x => x !== i); else { sel.push(i); if (sel.length > 2) sel.shift(); }
+      paint();
+    });
+    go.onclick = () => {
+      const ok = sel.length === 2 && right.every(r => sel.includes(r));
+      if (ok) { done = true; SFX.win(); if (!tries) record({ id: CUR.id, skill: 'evidence' }, true, 'ev'); b.querySelectorAll('.pin').forEach(p => { if (right.includes(+p.dataset.pin)) p.classList.add('proof'); }); msg.textContent = 'Case cracked! ' + f.proofWhy; go.remove(); gotIt(foot, res, 'Unmask them! 🔦'); return; }
+      tries++; SFX.buzz();
+      if (tries === 1) { record({ id: CUR.id, skill: 'evidence' }, false, 'ev'); msg.textContent = '🕯️ ' + f.proofHint; sel = []; paint(); }
+      else { done = true; go.remove(); b.querySelectorAll('.pin').forEach(p => { p.classList.remove('sel'); if (right.includes(+p.dataset.pin)) p.classList.add('proof'); }); msg.textContent = f.proofWhy; gotIt(foot, res, 'Unmask them! 🔦'); }
+    };
+  });
+  b.classList.remove('on'); CUR = null;
+  unmask();
+}
+
+/* =====================================================================
+   Unmask and results
+   ===================================================================== */
+const UM = { t: 0, step: 0 };
+function unmask() {
+  S.mode = 'unmask'; UM.t = 0; UM.step = 0; updHud(); SFX.whoosh();
+  const c = caseData(), card = $('unmaskCard');
+  const show = () => {
+    card.innerHTML = `<p>${esc(c.unmask[UM.step])}</p><div class="row"><button class="btn sm" id="umSay" aria-label="Read it to me">🔊</button><button class="btn go" id="umNext">${UM.step < c.unmask.length - 1 ? 'Next ▸' : 'Case closed!'}</button></div>`;
+    $('umSay').onclick = () => speak(c.unmask[UM.step]);
+    $('umNext').onclick = () => { SFX.tap(); if (UM.step < c.unmask.length - 1) { UM.step++; show(); } else { card.classList.remove('on'); finishCase(); } };
+  };
+  card.classList.add('on'); show();
+}
+function drawUnmask(dt) {
+  const c = caseData(); UM.t += dt;
+  const p = clamp(UM.t / 2.2, 0, 1), e = p * p * (3 - 2 * p);
+  if (c.creature === 'mumbles') {
+    ART.attic.draw({ earned: true, arrow: false });
+    drawMumbles(720, 520 - e * 420, { a: 1 - e * .9, scale: 1.8 });
+    if (UM.step >= 1) { drawMumbles(720, 640, { scale: .9, hat: UM.step >= 3 }); }
+    if (UM.step >= 4) for (let i = 0; i < 40; i++) { const x = (i * 97 + UM.t * 40) % W, y = (i * 53 + UM.t * 120) % 700; R(x, y, 10, 14, ['#ff7a4a', '#ffcf4a', '#62d26f', '#4fb0ff', '#c77dff'][i % 5]); }
+  } else if (c.creature === 'lamplighter') {
+    ART.platform.draw({ earned: true, arrow: false });
+    drawLamplighter(760, { t: 0, stilt: 1 - e, scale: 1 - e * .55 });
+    if (e > .9) { // bunny slippers
+      for (const dx of [-16, 16]) { ell(760 + dx, FLOOR - 6, 22, 12, '#ffd6e8', INK, 3); ell(760 + dx - 6, FLOOR - 22, 5, 12, '#ffd6e8', INK, 2); ell(760 + dx + 6, FLOOR - 22, 5, 12, '#ffd6e8', INK, 2); }
+    }
+    if (UM.step >= 4) { R(1000, 640, 360, 240, '#3a2a20'); rr(1030, 700, 300, 150, 20, '#2b5a3a', INK, 6); circ(1080, 860, 30, INK); circ(1280, 860, 30, INK); txt('9', 1180, 760, 60, '#ffcf4a', 'center', 'Creepster, fantasy', '400'); }
+  } else {
+    ART.towerStairs.draw({ earned: true, arrow: false, shadow: 1 - e });
+    drawTock(1060, 380, { open: 1, scale: 1.1 - e * .4 });
+    if (UM.step >= 4) txt('HOO!', 1060, 280, 60, '#ffcf4a', 'center', 'Creepster, fantasy', '400');
+  }
+  darkness([[720, 500, 900]], .25);
+  drawKid(300, FLOOR, { coat: save.coat, face: 1 });
+  drawWick(240, FLOOR - 250 + Math.sin(S.t * 3) * 8, 0, 1.2);
+}
+function finishCase() {
+  const c = caseData();
+  const most = RUN.qN ? RUN.qOk / RUN.qN >= .75 : false;
+  const allEv = RUN.evN > 0 && RUN.evOk === RUN.evN;
+  const stars = 1 + (most ? 1 : 0) + (allEv ? 1 : 0);
+  save.solved[c.id] = Math.max(save.solved[c.id] || 0, stars);
+  save.unlocked = Math.max(save.unlocked || 1, Math.min(CASES.length, c.id + 1));
+  const result = { stars, q: `${RUN.qOk}/${RUN.qN}`, ev: `${RUN.evOk}/${RUN.evN}` };
+  save.run = null; RUN = null; save.sel = Math.min(CASES.length, c.id + 1);
+  persist(); SFX.win();
+  S.mode = 'done';
+  const next = CASES[c.id];
+  $('doneCard').innerHTML = `<div class="small">Case ${c.id}</div><h2>${esc(c.title)}: solved!</h2>
+    <div class="stars">${[1, 2, 3].map(i => `<span class="${i <= stars ? '' : 'off'}">★</span>`).join('')}</div>
+    <p>★ You solved it. ${most ? '★' : '☆'} Most answers right on the first try (${result.q}). ${allEv ? '★' : '☆'} Every proof found on the first try (${result.ev}).</p>
+    <div class="row">${next ? `<button class="btn go" id="doneNext">Next case: ${esc(next.title)}</button>` : '<p><b>You solved every case in Creakwood!</b></p>'}<button class="btn sm" id="doneTitle">Title</button></div>`;
+  screen('sDone');
+  if (next) $('doneNext').onclick = () => { save.sel = next.id; persist(); openIntro(next.id); };
+  $('doneTitle').onclick = () => toTitle();
+  return result;
+}
+
+/* =====================================================================
+   Screens: title, intro, players, grown-ups, menu
+   ===================================================================== */
+function screen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
+function toTitle() {
+  hideClue(); $('board').classList.remove('on'); $('unmaskCard').classList.remove('on'); $('doorbar').classList.remove('on'); setAct(null); wickHide();
+  S.mode = 'title'; RUN = null; WORLD = W0(); layoutSpots(); updHud(); refreshTitle(); screen('sTitle');
+}
+function refreshTitle() {
+  if (!save.sel || save.sel > (save.unlocked || 1)) save.sel = save.unlocked || 1;
+  $('caseRow').innerHTML = CASES.map(c => {
+    const lock = c.id > (save.unlocked || 1), st = save.solved[c.id] || 0;
+    return `<button class="case ${c.id === save.sel ? 'sel' : ''} ${lock ? 'lock' : ''}" data-case="${c.id}" ${lock ? 'disabled aria-disabled="true"' : ''}><span class="small">Case ${c.id}</span><b>${esc(c.title)}</b>${lock ? `🔒 Solve Case ${c.id - 1} first` : st ? `<span class="st">${'★'.repeat(st)}${'☆'.repeat(3 - st)}</span>` : 'New!'}</button>`;
+  }).join('');
+  $('caseRow').querySelectorAll('[data-case]').forEach(b => b.onclick = () => { if (b.disabled) return; SFX.tap(); save.sel = +b.dataset.case; persist(); refreshTitle(); });
+  const run = save.run;
+  $('startBtn').textContent = run && run.c === save.sel - 1 ? `Continue (clue ${Math.min(5, run.clues.length + 1)} of 5)` : 'Start the case';
+  const pl = curPlayer();
+  $('playerBtn').textContent = `👤 ${playerName(pl)} · switch`;
+  $('titleInfo').textContent = `Reading ${LEVELS[save.settings.level].name} (${LEVELS[save.settings.level].grade}). Grown-ups can change it.`;
+}
+$('startBtn').onclick = () => { ac(); SFX.tap(); const run = save.run; if (run && run.c === save.sel - 1) return resumeCase(); openIntro(save.sel); };
+function openIntro(id) {
+  const c = CASES[id - 1];
+  $('introCap').textContent = `Case ${c.id} of ${CASES.length}`; $('introTitle').textContent = c.title; $('introText').textContent = c.intro;
+  $('introSay').onclick = () => speak(c.intro);
+  $('introGo').onclick = () => { SFX.tap(); startCase(id); };
+  S.mode = 'intro'; screen('sIntro');
+}
+function newRun(c) { return { c, s: 0, clues: [], star: {}, qN: 0, qOk: 0, evN: 0, evOk: 0, due: [], caught: 0, started: false }; }
+function startCase(id) { save.run = RUN = newRun(id - 1); persist(); screen(null); enterScene(0); }
+function resumeCase() { RUN = save.run; RUN.due = RUN.due || []; RUN.star = RUN.star || {}; screen(null); enterScene(clamp(RUN.s, 0, 4)); }
+
+$('menuBtn').onclick = () => { if (S.mode !== 'explore') return; SFX.tap(); S.mode = 'menu'; $('soundBtn').textContent = 'Sound: ' + (save.settings.sound ? 'on' : 'off'); screen('sMenu'); layoutSpots(); };
+$('resumeBtn').onclick = () => { screen(null); S.mode = 'explore'; layoutSpots(); };
+$('soundBtn').onclick = () => { save.settings.sound = !save.settings.sound; persist(); $('soundBtn').textContent = 'Sound: ' + (save.settings.sound ? 'on' : 'off'); };
+$('quitBtn').onclick = () => { persist(); toTitle(); };
+
+// Grown-ups: press and hold so a kid doesn't wander in by accident
+(() => {
+  const b = $('adultBtn'), fill = b.querySelector('i'); let t0 = 0, raf = 0;
+  const stop = () => { cancelAnimationFrame(raf); t0 = 0; fill.style.width = '0'; };
+  const tick = () => { const p = (performance.now() - t0) / 1100; fill.style.width = Math.min(100, p * 100) + '%'; if (p >= 1) { stop(); openAdult(); return; } raf = requestAnimationFrame(tick); };
+  b.addEventListener('pointerdown', e => { e.preventDefault(); t0 = performance.now(); raf = requestAnimationFrame(tick); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, stop));
+  b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAdult(); } });
+})();
+let resetArm = false;
+function openAdult() {
+  resetArm = false;
+  const sk = save.skills;
+  const pct = s => s && s.n ? Math.round(100 * s.ok / s.n) : null;
+  const row = (label, s) => { const v = pct(s); return `<div class="skillrow"><span>${esc(label)}</span><div class="bar"><i class="${v == null ? '' : v < 60 ? 'lo' : v < 80 ? 'mid' : ''}" style="width:${v || 0}%"></i></div><span>${v == null ? '—' : `${v}% <small>(${s.ok}/${s.n})</small>`}</span></div>`; };
+  const qById = {}; for (const c of CASES) for (const s of c.scenes) { for (const q of s.clue.qs) qById[q.id] = { q: q.q, skill: q.skill, cs: `${c.id}.${c.scenes.indexOf(s) + 1}` }; if (s.doors) qById[s.doors.id] = { q: s.doors.q, skill: s.doors.skill, cs: `${c.id}.${c.scenes.indexOf(s) + 1}` }; }
+  const tricky = Object.entries(save.miss).filter(([id]) => (save.box[id] || 0) < 2).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id, n]) => {
+    const base = id.replace(/:ev$/, ''), q = qById[base];
+    return q ? `<li><b>${esc(q.cs)}</b> ${esc(q.q)} <small>(${esc(SKILLS[q.skill] || q.skill)}${id.endsWith(':ev') ? ', proof tap' : ''}; missed ${n}×)</small></li>` : '';
+  }).join('');
+  const days = Object.keys(save.days).length;
+  const lv = save.settings.level;
+  $('adultCard').innerHTML = `<h2>Grown-ups</h2>
+    <p class="small" style="text-align:center;max-width:none">Showing <b>${esc(playerName(curPlayer()))}</b>. Each player has their own progress on this device.</p>
+    <h3>Reading level</h3>
+    <div class="chips">${[1, 2, 3].map(l => `<button class="chip ${lv === l ? 'on' : ''}" data-lv="${l}">${LEVELS[l].name}<small>${LEVELS[l].grade}, ${LEVELS[l].min}–${LEVELS[l].max} words</small></button>`).join('')}</div>
+    <p class="small" style="max-width:none">Every passage has all three versions. The questions are the same at every level.</p>
+    <h3>Reading help</h3>
+    <div class="chips"><button class="chip ${save.settings.readAloud ? 'on' : ''}" id="raBtn">🔊 "Read it to me" button for whole passages: ${save.settings.readAloud ? 'ON' : 'OFF'}</button><button class="chip ${save.settings.sound ? 'on' : ''}" id="sndBtn">Sound effects: ${save.settings.sound ? 'ON' : 'OFF'}</button></div>
+    <p class="small" style="max-width:none">Off by default, so the passage is his to read. Tapping a single word always says that word, and the questions and answers always have a 🔊 button. Speech needs a voice installed on the device.</p>
+    <h3>First-try accuracy by skill</h3>
+    ${Object.entries(SKILLS).map(([k, l]) => row(l, sk[k])).join('')}
+    ${row('Finding proof (evidence taps)', sk.evidence)}
+    <p class="small" style="max-width:none">Skills follow the Florida B.E.S.T. grade 3 reading standards. Door choices count as inference. A miss brings back a bonus question of the same skill later in the case when one is available.</p>
+    <h3>Cases</h3>
+    <p style="margin:4px 0;max-width:none;font-size:20px">${CASES.map(c => `Case ${c.id}: ${save.solved[c.id] ? '★'.repeat(save.solved[c.id]) + '☆'.repeat(3 - save.solved[c.id]) : c.id <= save.unlocked ? 'not solved yet' : 'locked'}`).join(' · ')}${days ? ` · played on ${days} day${days > 1 ? 's' : ''}` : ''}</p>
+    ${tricky ? `<h3>Questions to revisit</h3><ul class="tricky">${tricky}</ul>` : ''}
+    <div class="row"><button class="btn" id="adultBack">Done</button><button class="btn sm" id="resetBtn">Reset this player's progress</button></div>`;
+  screen('sAdult');
+  $('adultCard').querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { save.settings.level = +b.dataset.lv; persist(); openAdult(); });
+  $('raBtn').onclick = () => { save.settings.readAloud = !save.settings.readAloud; persist(); openAdult(); };
+  $('sndBtn').onclick = () => { save.settings.sound = !save.settings.sound; persist(); openAdult(); };
+  $('adultBack').onclick = () => { refreshTitle(); screen('sTitle'); };
+  $('resetBtn').onclick = () => {
+    if (!resetArm) { resetArm = true; $('resetBtn').textContent = 'Tap again to erase everything for this player'; $('resetBtn').style.background = '#ff9a8a'; return; }
+    const keep = { settings: save.settings, coat: save.coat }; save = Object.assign(fresh(), keep); persist(); openAdult();
+  };
+}
+
+function openPlayers(editing = null) {
+  const card = $('playersCard');
+  card.innerHTML = `<h2>Who's playing?</h2><p class="small">Everyone gets their own cases, stars and reading level.</p>
+    <div class="players">${P.list.map(pl => {
+      const sv = pl.id === P.cur ? save : load(pl.id);
+      const solved = Object.keys(sv.solved).length;
+      return editing === pl.id
+        ? `<div class="player on"><input id="pname" maxlength="14" value="${esc(pl.name)}" placeholder="${esc(playerName(pl))}" aria-label="Player name"><button class="btn sm" data-save="${pl.id}">Save</button></div>`
+        : `<div class="player ${pl.id === P.cur ? 'on' : ''}"><button class="who" data-pick="${pl.id}">${pl.id === P.cur ? '▶ ' : ''}${esc(playerName(pl))}<small>${solved} case${solved === 1 ? '' : 's'} solved · ${LEVELS[sv.settings.level].name}</small></button><button class="btn sm" data-edit="${pl.id}" aria-label="Rename">✏️</button></div>`;
+    }).join('')}</div>
+    <h3>Raincoat color</h3>
+    <div class="coats">${COATS.map(c => `<button class="coat ${save.coat === c ? 'on' : ''}" data-coat="${c}" style="background:${c}" aria-label="Raincoat color"></button>`).join('')}</div>
+    <div class="row">${P.list.length < 6 ? '<button class="btn sm" data-a="add">➕ New player</button>' : ''}<button class="btn" data-a="back">Done</button></div>`;
+  screen('sPlayers');
+  const name = card.querySelector('#pname'); if (name) name.focus();
+  card.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return; SFX.tap();
+    if (b.dataset.pick) { if (b.dataset.pick !== P.cur) switchPlayer(b.dataset.pick); return openPlayers(); }
+    if (b.dataset.edit) return openPlayers(b.dataset.edit);
+    if (b.dataset.save) { const pl = P.list.find(x => x.id === b.dataset.save); pl.name = name.value.trim().slice(0, 14); savePlayers(); return openPlayers(); }
+    if (b.dataset.coat) { save.coat = b.dataset.coat; persist(); return openPlayers(editing); }
+    if (b.dataset.a === 'add') { let n = 2; while (P.list.some(x => x.id === 'p' + n)) n++; P.list.push({ id: 'p' + n, name: '' }); switchPlayer('p' + n); return openPlayers('p' + n); }
+    if (b.dataset.a === 'back') { refreshTitle(); screen('sTitle'); }
+  };
+}
+$('playerBtn').onclick = () => { SFX.tap(); openPlayers(); };
+
+/* ---------- title scene ---------- */
+function drawTitle() {
+  sky('#0b0920', '#3a2a60', [300, 170]);
+  // town skyline
+  const houses = [[640, 260, 140], [790, 200, 110], [910, 300, 120], [1040, 230, 100], [1150, 280, 150], [1310, 220, 130]];
+  for (const [x, h, w] of houses) { rr(x, FLOOR - h, w, h, 2, '#1c1636', INK, 4); poly([[x - 10, FLOOR - h], [x + w / 2, FLOOR - h - 60], [x + w + 10, FLOOR - h]], '#161130', INK, 4); for (let i = 0; i < 2; i++) rr(x + 18 + i * (w - 56), FLOOR - h + 40, 26, 34, 3, (i + x) % 3 ? '#ffcf4a' : '#2b2450'); }
+  rr(980, 260, 90, 360, 2, '#211a3e', INK, 4); poly([[970, 262], [1025, 170], [1080, 262]], '#1a1434', INK, 4); circ(1025, 320, 30, '#f6ebcf', INK, 4); clockHands(1025, 320, 24);
+  ground('#191428', '#241d38');
+  for (let i = 0; i < 5; i++) { const bx = (S.t * 60 + i * 300) % (W + 200) - 100, by = 200 + Math.sin(S.t * 2 + i) * 30 + i * 30, f = Math.sin(S.t * 12 + i) * 10; poly([[bx, by], [bx - 26, by - 10 - f], [bx - 12, by], [bx + 12, by], [bx + 26, by - 10 - f]], '#0a0818'); }
+  drawMumbles(560, 430 + Math.sin(S.t * 1.4) * 20, { a: .55, scale: .7 });
+  drawKid(240, FLOOR, { coat: save.coat, face: 1, phase: 0 });
+  drawWick(180, FLOOR - 250 + Math.sin(S.t * 3) * 8, 0, 1.15);
+  darkness([[300, 170, 400], [310, FLOOR - 80, 560], [1025, 320, 160]], .35);
+}
+
+/* =====================================================================
+   Main loop
+   ===================================================================== */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(.05, (now - last) / 1000) * FAST; last = now; S.t += dt;
+  if (S.mode === 'explore') updWorld(dt);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#0a0818'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(DPR * SC, 0, 0, DPR * SC, DPR * OX, DPR * OY);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  if (S.mode === 'title' || S.mode === 'intro' || (S.mode === 'done')) drawTitle();
+  else if (S.mode === 'unmask') drawUnmask(dt);
+  else drawWorld();
+  ctx.restore();
+  drawWickFace();
+  requestAnimationFrame(loop);
+}
+resize(); refreshTitle(); requestAnimationFrame(loop);
+
+/* =====================================================================
+   Debug hooks: ?debug exposes window.__cw; ?test= stages each mechanic.
+   ===================================================================== */
+if (DEBUG) {
+  const loadCase = n => { screen(null); hideClue(); $('board').classList.remove('on'); save.unlocked = Math.max(save.unlocked, n); save.sel = n; startCase(n); };
+  const scene = n => { if (!RUN) loadCase(1); hideClue(); RUN.clues = caseData().scenes.slice(0, n - 1).map(s => s.id); enterScene(n - 1); };
+  window.__cw = {
+    get S() { return S; }, get save() { return save; }, get RUN() { return RUN; }, get WORLD() { return WORLD; }, get Q() { return CUR; },
+    CASES, LEVELS, loadCase, scene, openBoard, unmask, toTitle, openAdult,
+    set fast(v) { FAST = v; }, get fast() { return FAST; },
+    spotXY(id) { const el = document.querySelector(`[data-spot="${id}"]`); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; },
+    get said() { return lastSaid; },
+  };
+  const t = QS.get('test');
+  const openFirst = () => { loadCase(1); return openSceneClue(); };
+  if (t === 'read') openFirst();
+  if (t === 'evidence') { loadCase(1); S.mode = 'card'; showClue(WORLD.sc); askEvidence(WORLD.sc.clue.qs.find(q => q.ev), 'Question 2 of 3'); }
+  if (t === 'order') { loadCase(1); scene(3); S.mode = 'card'; showClue(WORLD.sc); askOrder(WORLD.sc.clue.qs.find(q => q.type === 'order'), 'Question 1 of 3'); }
+  if (t === 'doors') { loadCase(1); scene(2); WORLD.earned = true; RUN.clues.push(WORLD.sc.id); WORLD.px = WORLD.tx = 560; WORLD.doorAsk = true; showDoorBar(); layoutSpots(); }
+  if (t === 'board') { loadCase(1); RUN.clues = caseData().scenes.map(s => s.id); RUN.star = { c1s1: true, c1s3: true }; openBoard(); }
+  if (t === 'unmask') { loadCase(1); unmask(); }
+  if (t === 'lamp') { loadCase(2); WORLD.cr.t = 1; }
+  if (t === 'tock') { loadCase(3); WORLD.cr.t = 1; }
+}
+</script>
+</body>
+</html>
